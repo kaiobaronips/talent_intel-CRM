@@ -1,0 +1,152 @@
+from __future__ import annotations
+
+import json
+from contextlib import contextmanager
+from typing import Any, Iterator
+
+import psycopg
+from psycopg.rows import dict_row
+
+from talent_intel_crm.support import env
+
+
+def database_url() -> str:
+    return env("SUPABASE_DB_URL") or env("DATABASE_URL")
+
+
+@contextmanager
+def get_connection() -> Iterator[psycopg.Connection[Any]]:
+    db_url = database_url()
+    if not db_url:
+        raise RuntimeError("SUPABASE_DB_URL or DATABASE_URL is required")
+    connection = psycopg.connect(db_url, row_factory=dict_row)
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def upsert_tenant(payload: dict[str, Any]) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                insert into tenants (
+                    id, slug, company_name, tier, primary_domain, timezone, metadata_json
+                ) values (
+                    %(tenant_id)s, %(slug)s, %(company_name)s, %(tier)s, %(primary_domain)s, %(timezone)s, %(metadata_json)s::jsonb
+                )
+                on conflict (id) do update set
+                    slug = excluded.slug,
+                    company_name = excluded.company_name,
+                    tier = excluded.tier,
+                    primary_domain = excluded.primary_domain,
+                    timezone = excluded.timezone,
+                    metadata_json = excluded.metadata_json,
+                    updated_at = now()
+                returning id, slug, company_name, tier, primary_domain, timezone, created_at, updated_at
+                """,
+                {
+                    "tenant_id": payload["tenant_id"],
+                    "slug": payload.get("slug") or payload["tenant_id"],
+                    "company_name": payload["company_name"],
+                    "tier": payload.get("tier", "starter"),
+                    "primary_domain": payload.get("primary_domain", ""),
+                    "timezone": payload.get("timezone", "America/Sao_Paulo"),
+                    "metadata_json": json.dumps(payload.get("metadata", {}), ensure_ascii=False),
+                },
+            )
+            return dict(cur.fetchone() or {})
+
+
+def upsert_candidate(payload: dict[str, Any]) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                insert into candidates (
+                    id, tenant_id, external_id, name, city, email, linkedin_url, stage, source_page_id, metadata_json
+                ) values (
+                    %(candidate_id)s, %(tenant_id)s, %(external_id)s, %(name)s, %(city)s, %(email)s, %(linkedin_url)s, %(stage)s, %(source_page_id)s, %(metadata_json)s::jsonb
+                )
+                on conflict (id) do update set
+                    tenant_id = excluded.tenant_id,
+                    external_id = excluded.external_id,
+                    name = excluded.name,
+                    city = excluded.city,
+                    email = excluded.email,
+                    linkedin_url = excluded.linkedin_url,
+                    stage = excluded.stage,
+                    source_page_id = excluded.source_page_id,
+                    metadata_json = excluded.metadata_json,
+                    updated_at = now()
+                returning id, tenant_id, external_id, name, city, email, linkedin_url, stage, created_at, updated_at
+                """,
+                {
+                    "candidate_id": payload["candidate_id"],
+                    "tenant_id": payload["tenant_id"],
+                    "external_id": payload.get("external_id") or payload["candidate_id"],
+                    "name": payload["name"],
+                    "city": payload.get("city", ""),
+                    "email": payload.get("email", ""),
+                    "linkedin_url": payload.get("linkedin_url", ""),
+                    "stage": payload["stage"],
+                    "source_page_id": payload.get("source_page_id"),
+                    "metadata_json": json.dumps(payload.get("metadata", {}), ensure_ascii=False),
+                },
+            )
+            return dict(cur.fetchone() or {})
+
+
+def append_interaction_row(payload: dict[str, Any]) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                insert into interactions (
+                    tenant_id, candidate_id, channel, message_type, status, provider_message_id, provider_thread_id, payload_json
+                ) values (
+                    %(tenant_id)s, %(candidate_id)s, %(channel)s, %(message_type)s, %(status)s, %(provider_message_id)s, %(provider_thread_id)s, %(payload_json)s::jsonb
+                )
+                returning id, tenant_id, candidate_id, channel, message_type, status, created_at
+                """,
+                {
+                    "tenant_id": payload["tenant_id"],
+                    "candidate_id": payload["candidate_id"],
+                    "channel": payload.get("channel", ""),
+                    "message_type": payload.get("message_type", ""),
+                    "status": payload.get("status", "pending"),
+                    "provider_message_id": payload.get("provider_message_id"),
+                    "provider_thread_id": payload.get("provider_thread_id"),
+                    "payload_json": json.dumps(payload, ensure_ascii=False),
+                },
+            )
+            return dict(cur.fetchone() or {})
+
+
+def append_audit_event(payload: dict[str, Any]) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                insert into audit_events (
+                    tenant_id, candidate_id, event_type, actor_type, actor_id, payload_json
+                ) values (
+                    %(tenant_id)s, %(candidate_id)s, %(event_type)s, %(actor_type)s, %(actor_id)s, %(payload_json)s::jsonb
+                )
+                returning id, tenant_id, candidate_id, event_type, actor_type, actor_id, created_at
+                """,
+                {
+                    "tenant_id": payload["tenant_id"],
+                    "candidate_id": payload.get("candidate_id"),
+                    "event_type": payload["event_type"],
+                    "actor_type": payload.get("actor_type", "system"),
+                    "actor_id": payload.get("actor_id", "temporal-worker"),
+                    "payload_json": json.dumps(payload.get("payload", {}), ensure_ascii=False),
+                },
+            )
+            return dict(cur.fetchone() or {})
