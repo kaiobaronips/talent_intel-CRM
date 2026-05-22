@@ -2,6 +2,11 @@ from dataclasses import dataclass
 import os
 from typing import Optional
 
+from talent_intel_crm.support import load_local_env
+
+
+load_local_env()
+
 
 @dataclass(frozen=True)
 class TemporalConfig:

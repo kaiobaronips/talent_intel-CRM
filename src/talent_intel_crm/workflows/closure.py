@@ -19,7 +19,6 @@ class CandidateClosureWorkflow:
             record_workflow_run,
             {
                 "tenant_id": candidate.tenant_id,
-                "candidate_id": candidate.candidate_id,
                 "workflow_name": "CandidateClosure",
                 "workflow_id": info.workflow_id,
                 "run_id": info.run_id,

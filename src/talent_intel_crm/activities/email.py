@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from temporalio import activity
+
 from talent_intel_crm.support import action_result, env, post_json
 
 
+@activity.defn
 def send_initial_email(payload: dict[str, Any]) -> dict[str, Any]:
     """Send the first email contact through the approved mail provider."""
     endpoint = env("EMAIL_SEND_WEBHOOK_URL")

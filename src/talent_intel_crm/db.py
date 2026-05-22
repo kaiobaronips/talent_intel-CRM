@@ -156,6 +156,11 @@ def upsert_workflow_run(payload: dict[str, Any]) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:
             cur.execute("create unique index if not exists idx_workflow_runs_run_id on workflow_runs (run_id)")
+            candidate_id = payload.get("candidate_id")
+            if candidate_id:
+                cur.execute("select 1 from candidates where id = %s", (candidate_id,))
+                if cur.fetchone() is None:
+                    candidate_id = None
             cur.execute(
                 """
                 insert into workflow_runs (
@@ -175,7 +180,7 @@ def upsert_workflow_run(payload: dict[str, Any]) -> dict[str, Any]:
                 """,
                 {
                     "tenant_id": payload["tenant_id"],
-                    "candidate_id": payload.get("candidate_id"),
+                    "candidate_id": candidate_id,
                     "workflow_name": payload["workflow_name"],
                     "workflow_id": payload["workflow_id"],
                     "run_id": payload["run_id"],

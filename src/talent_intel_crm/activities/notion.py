@@ -4,7 +4,7 @@ import json
 import urllib.error
 import urllib.request
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Optional
 
 from talent_intel_crm.config import NotionMirrorConfig
 from talent_intel_crm.support import action_result
@@ -72,7 +72,7 @@ def _multi_select(values: list[str]) -> dict[str, Any]:
     return {"multi_select": options}
 
 
-def _request(path: str, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
+def _request(path: str, method: str = "GET", payload: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     config = NotionMirrorConfig()
     if not config.api_token:
         raise RuntimeError("NOTION_MIRROR_API_TOKEN or NOTION_API_TOKEN is required")

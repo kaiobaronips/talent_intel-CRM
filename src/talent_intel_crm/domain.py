@@ -24,7 +24,7 @@ class TenantTier(str, Enum):
     SCALE = "scale"
 
 
-@dataclass(slots=True)
+@dataclass
 class TenantEnvelope:
     tenant_id: str
     company_name: str
@@ -33,11 +33,11 @@ class TenantEnvelope:
     timezone: str = "America/Sao_Paulo"
 
 
-@dataclass(slots=True)
+@dataclass
 class CandidateEnvelope:
     candidate_id: str
-    tenant_id: str = "default"
     name: str
+    tenant_id: str = "default"
     city: str = ""
     email: str = ""
     linkedin_url: str = ""
@@ -46,7 +46,7 @@ class CandidateEnvelope:
     source_page_id: Optional[str] = None
 
 
-@dataclass(slots=True)
+@dataclass
 class InteractionEnvelope:
     tenant_id: str
     candidate_id: str

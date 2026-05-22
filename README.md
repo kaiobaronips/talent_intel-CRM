@@ -37,6 +37,14 @@ Veja o blueprint completo em `docs/saas-architecture.md` e a camada Temporal em 
 python -m talent_intel_crm.worker
 ```
 
+Para disparos controlados:
+
+```bash
+python -m talent_intel_crm.runner smoke
+python -m talent_intel_crm.runner tenant-onboarding --tenant-id acme --company-name "Acme RH"
+python -m talent_intel_crm.runner candidate-lifecycle --tenant-id acme --candidate-id cand-001 --name "Jane Doe" --email jane@example.com --channels email linkedin
+```
+
 O worker ja roda com uma camada de persistencia em Postgres; o proximo passo e apontar `SUPABASE_DB_URL`, os canais reais de envio e, opcionalmente, o espelhamento visual no Notion.
 
 ## Temporal Cloud
@@ -50,6 +58,8 @@ export TEMPORAL_API_KEY="..."
 export TEMPORAL_TASK_QUEUE="talent-intel-crm"
 python -m talent_intel_crm.worker
 ```
+
+O worker e o runner carregam `.env` do diretorio em que o comando e executado antes de ler as configuracoes. Use `.env.example` como modelo para manter a chave Temporal, o DSN Supabase e o token do Notion fora do Git.
 
 Se o `TEMPORAL_API_KEY` estiver definido, o SDK habilita TLS automaticamente.
 

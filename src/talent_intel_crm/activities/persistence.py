@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from temporalio import activity
+
 from talent_intel_crm.db import (
     append_audit_event,
     append_interaction_row,
@@ -20,6 +22,7 @@ from talent_intel_crm.activities.notion import (
 from talent_intel_crm.support import action_result
 
 
+@activity.defn
 def upsert_tenant_record(payload: dict[str, Any]) -> dict[str, Any]:
     if not database_url():
         return action_result("postgres.upsert_tenant_record", payload, executed=False)
@@ -28,6 +31,7 @@ def upsert_tenant_record(payload: dict[str, Any]) -> dict[str, Any]:
     return action_result("postgres.upsert_tenant_record", payload, "postgres", True, {"postgres": result, "notion": notion})
 
 
+@activity.defn
 def upsert_candidate_record(payload: dict[str, Any]) -> dict[str, Any]:
     if not database_url():
         return action_result("postgres.upsert_candidate_record", payload, executed=False)
@@ -36,6 +40,7 @@ def upsert_candidate_record(payload: dict[str, Any]) -> dict[str, Any]:
     return action_result("postgres.upsert_candidate_record", payload, "postgres", True, {"postgres": result, "notion": notion})
 
 
+@activity.defn
 def append_interaction(payload: dict[str, Any]) -> dict[str, Any]:
     if not database_url():
         return action_result("postgres.append_interaction", payload, executed=False)
@@ -44,6 +49,7 @@ def append_interaction(payload: dict[str, Any]) -> dict[str, Any]:
     return action_result("postgres.append_interaction", payload, "postgres", True, {"postgres": result, "notion": notion})
 
 
+@activity.defn
 def record_audit_event(payload: dict[str, Any]) -> dict[str, Any]:
     if not database_url():
         return action_result("postgres.record_audit_event", payload, executed=False)
@@ -52,6 +58,7 @@ def record_audit_event(payload: dict[str, Any]) -> dict[str, Any]:
     return action_result("postgres.record_audit_event", payload, "postgres", True, {"postgres": result, "notion": notion})
 
 
+@activity.defn
 def record_workflow_run(payload: dict[str, Any]) -> dict[str, Any]:
     if not database_url():
         return action_result("postgres.record_workflow_run", payload, executed=False)
