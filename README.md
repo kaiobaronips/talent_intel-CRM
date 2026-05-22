@@ -37,6 +37,12 @@ Veja o blueprint completo em `docs/saas-architecture.md` e a camada Temporal em 
 python -m talent_intel_crm.worker
 ```
 
+Para expor a API HTTP:
+
+```bash
+uvicorn talent_intel_crm.api:app --host 0.0.0.0 --port 8000
+```
+
 Para disparos controlados:
 
 ```bash
@@ -44,6 +50,7 @@ python -m talent_intel_crm.runner smoke
 python -m talent_intel_crm.runner tenant-onboarding --tenant-id acme --company-name "Acme RH"
 python -m talent_intel_crm.runner candidate-lifecycle --tenant-id acme --candidate-id cand-001 --name "Jane Doe" --email jane@example.com --channels email linkedin
 python -m talent_intel_crm.runner candidate-step --step outreach --tenant-id acme --candidate-id cand-001 --name "Jane Doe" --email jane@example.com --linkedin-url https://www.linkedin.com/in/jane-doe --channels email linkedin --stage qualified
+python -m talent_intel_crm.runner candidate-step --step follow-up --tenant-id acme --candidate-id cand-001 --name "Jane Doe" --email jane@example.com --linkedin-url https://www.linkedin.com/in/jane-doe --channels email linkedin --stage contacted --follow-up-delay-seconds 0 0
 ```
 
 O worker ja roda com uma camada de persistencia em Postgres; o proximo passo e apontar `SUPABASE_DB_URL`, os canais reais de envio e, opcionalmente, o espelhamento visual no Notion.
@@ -79,6 +86,20 @@ As activities usam `Supabase Postgres` como persistencia principal e webhooks op
 - `NOTION_MIRROR_AUDIT_EVENTS_DATA_SOURCE_ID`
 
 Se os endpoints de canal nao estiverem configurados, a activity roda em `dry-run` e retorna o payload que seria enviado. Isso permite validar o fluxo Temporal sem acoplar credenciais antes da hora.
+
+## Cadencia
+
+`CandidateFollowUpWorkflow` usa timers duraveis do Temporal. A cadencia padrao abre follow-ups em D+5 e D+7; o runner aceita `--follow-up-delay-seconds` apenas para validacoes controladas com atrasos curtos.
+
+## Idempotencia
+
+Interacoes criadas pelos workflows carregam uma chave estavel por candidato, canal e etapa da cadencia. O Postgres aplica unicidade por tenant para que retries de activity ou replays nao dupliquem a mesma interacao operacional.
+
+## API HTTP
+
+`POST /v1/tenants` dispara o onboarding do tenant e `POST /v1/candidates` dispara o lifecycle do candidato. As rotas retornam `202` com `workflow_id` e `run_id`; o progresso continua no Temporal e na persistencia. A rota de candidato exige que o tenant ja exista na persistencia.
+
+Defina `TICRM_API_KEY` para exigir `X-API-Key` nas rotas de escrita. `GET /health` fica aberto para probes do servico.
 
 ## Notion Mirror
 

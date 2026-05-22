@@ -60,6 +60,7 @@ def _add_candidate_arguments(parser: argparse.ArgumentParser, include_stage: boo
     parser.add_argument("--source-page-id", default="")
     if include_stage:
         parser.add_argument("--stage", choices=[stage.value for stage in CandidateStage], default=CandidateStage.INGESTED.value)
+        parser.add_argument("--follow-up-delay-seconds", nargs="*", type=int, default=[])
 
 
 def _candidate_payload(args: argparse.Namespace) -> dict[str, object]:
@@ -75,6 +76,8 @@ def _candidate_payload(args: argparse.Namespace) -> dict[str, object]:
     }
     if getattr(args, "stage", ""):
         payload["stage"] = args.stage
+    if getattr(args, "follow_up_delay_seconds", []):
+        payload["follow_up_delays_seconds"] = list(args.follow_up_delay_seconds)
     return payload
 
 

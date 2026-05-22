@@ -63,6 +63,13 @@ def upsert_tenant(payload: dict[str, Any]) -> dict[str, Any]:
             return dict(cur.fetchone() or {})
 
 
+def tenant_exists(tenant_id: str) -> bool:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute("select 1 from tenants where id = %s", (tenant_id,))
+            return cur.fetchone() is not None
+
+
 def upsert_candidate(payload: dict[str, Any]) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:
@@ -108,11 +115,16 @@ def append_interaction_row(payload: dict[str, Any]) -> dict[str, Any]:
             cur.execute(
                 """
                 insert into interactions (
-                    tenant_id, candidate_id, channel, message_type, status, provider_message_id, provider_thread_id, payload_json
+                    tenant_id, candidate_id, channel, message_type, status, provider_message_id, provider_thread_id, idempotency_key, payload_json
                 ) values (
-                    %(tenant_id)s, %(candidate_id)s, %(channel)s, %(message_type)s, %(status)s, %(provider_message_id)s, %(provider_thread_id)s, %(payload_json)s::jsonb
+                    %(tenant_id)s, %(candidate_id)s, %(channel)s, %(message_type)s, %(status)s, %(provider_message_id)s, %(provider_thread_id)s, %(idempotency_key)s, %(payload_json)s::jsonb
                 )
-                returning id, tenant_id, candidate_id, channel, message_type, status, created_at
+                on conflict (tenant_id, idempotency_key) where idempotency_key <> '' do update set
+                    status = excluded.status,
+                    provider_message_id = coalesce(excluded.provider_message_id, interactions.provider_message_id),
+                    provider_thread_id = coalesce(excluded.provider_thread_id, interactions.provider_thread_id),
+                    payload_json = excluded.payload_json
+                returning id, tenant_id, candidate_id, channel, message_type, status, idempotency_key, created_at
                 """,
                 {
                     "tenant_id": payload["tenant_id"],
@@ -122,6 +134,7 @@ def append_interaction_row(payload: dict[str, Any]) -> dict[str, Any]:
                     "status": payload.get("status", "pending"),
                     "provider_message_id": payload.get("provider_message_id"),
                     "provider_thread_id": payload.get("provider_thread_id"),
+                    "idempotency_key": payload.get("idempotency_key", ""),
                     "payload_json": json.dumps(payload, ensure_ascii=False),
                 },
             )

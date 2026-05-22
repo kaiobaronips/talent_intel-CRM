@@ -12,6 +12,9 @@ with workflow.unsafe.imports_passed_through():
     from talent_intel_crm.domain import CandidateChannel, CandidateStage
 
 
+PERSISTENCE_TIMEOUT = timedelta(minutes=2)
+
+
 @workflow.defn
 class CandidateLifecycleWorkflow:
     """Main candidate lifecycle orchestration."""
@@ -33,7 +36,7 @@ class CandidateLifecycleWorkflow:
                 "status": "Running",
                 "payload": {"stage": candidate.stage.value},
             },
-            schedule_to_close_timeout=timedelta(seconds=30),
+            schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
@@ -41,7 +44,7 @@ class CandidateLifecycleWorkflow:
         await workflow.execute_activity(
             upsert_candidate_record,
             candidate_record(candidate, CandidateStage.INGESTED),
-            schedule_to_close_timeout=timedelta(seconds=30),
+            schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
@@ -49,7 +52,7 @@ class CandidateLifecycleWorkflow:
         await workflow.execute_activity(
             upsert_candidate_record,
             candidate_record(candidate, CandidateStage.ENRICHED),
-            schedule_to_close_timeout=timedelta(seconds=30),
+            schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
@@ -57,7 +60,7 @@ class CandidateLifecycleWorkflow:
         await workflow.execute_activity(
             upsert_candidate_record,
             candidate_record(candidate, CandidateStage.QUALIFIED),
-            schedule_to_close_timeout=timedelta(seconds=30),
+            schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
@@ -65,7 +68,7 @@ class CandidateLifecycleWorkflow:
         await workflow.execute_activity(
             upsert_candidate_record,
             candidate_record(candidate, CandidateStage.READY_TO_CONTACT),
-            schedule_to_close_timeout=timedelta(seconds=30),
+            schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
@@ -82,13 +85,13 @@ class CandidateLifecycleWorkflow:
                     "channel": CandidateChannel.EMAIL.value,
                     "message_type": "initial",
                 },
-                schedule_to_close_timeout=timedelta(seconds=30),
+                schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
             await workflow.execute_activity(
                 append_interaction,
                 interaction_record(candidate, CandidateChannel.EMAIL, "initial"),
-                schedule_to_close_timeout=timedelta(seconds=30),
+                schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
 
@@ -105,13 +108,13 @@ class CandidateLifecycleWorkflow:
                     "channel": CandidateChannel.LINKEDIN.value,
                     "message_type": "initial",
                 },
-                schedule_to_close_timeout=timedelta(seconds=30),
+                schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
             await workflow.execute_activity(
                 append_interaction,
                 interaction_record(candidate, CandidateChannel.LINKEDIN, "initial"),
-                schedule_to_close_timeout=timedelta(seconds=30),
+                schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
 
@@ -123,7 +126,7 @@ class CandidateLifecycleWorkflow:
         await workflow.execute_activity(
             upsert_candidate_record,
             candidate_record(candidate, candidate.stage),
-            schedule_to_close_timeout=timedelta(seconds=30),
+            schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
         await workflow.execute_activity(
@@ -134,7 +137,7 @@ class CandidateLifecycleWorkflow:
                 "event_type": "candidate.lifecycle_completed",
                 "payload": {"stage": candidate.stage.value, "channels": [channel.value for channel in candidate.channels]},
             },
-            schedule_to_close_timeout=timedelta(seconds=30),
+            schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
         await workflow.execute_activity(
@@ -149,7 +152,7 @@ class CandidateLifecycleWorkflow:
                 "payload": {"stage": candidate.stage.value, "channels": [channel.value for channel in candidate.channels]},
                 "finished_at": workflow.now(),
             },
-            schedule_to_close_timeout=timedelta(seconds=30),
+            schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 

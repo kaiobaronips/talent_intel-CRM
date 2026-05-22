@@ -19,6 +19,11 @@ class TemporalConfig:
 
 
 @dataclass(frozen=True)
+class APIConfig:
+    api_key: Optional[str] = os.getenv("TICRM_API_KEY") or None
+
+
+@dataclass(frozen=True)
 class NotionMirrorConfig:
     api_token: Optional[str] = os.getenv("NOTION_MIRROR_API_TOKEN") or os.getenv("NOTION_API_TOKEN") or None
     api_version: str = os.getenv("NOTION_MIRROR_API_VERSION", "2026-03-11")

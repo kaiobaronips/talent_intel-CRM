@@ -80,7 +80,13 @@ def candidate_record(candidate: CandidateEnvelope, stage: CandidateStage, **meta
     return record
 
 
-def interaction_record(candidate: CandidateEnvelope, channel: CandidateChannel, message_type: str) -> Dict[str, Any]:
+def interaction_record(
+    candidate: CandidateEnvelope,
+    channel: CandidateChannel,
+    message_type: str,
+    cadence_step: str = "",
+) -> Dict[str, Any]:
+    suffix = cadence_step or message_type
     return {
         "candidate_id": candidate.candidate_id,
         "tenant_id": candidate.tenant_id,
@@ -92,4 +98,6 @@ def interaction_record(candidate: CandidateEnvelope, channel: CandidateChannel, 
         "linkedin_url": candidate.linkedin_url,
         "stage": normalize_stage(candidate.stage).value,
         "source_page_id": candidate.source_page_id,
+        "cadence_step": cadence_step,
+        "idempotency_key": f"{candidate.candidate_id}:{channel.value}:{suffix}",
     }

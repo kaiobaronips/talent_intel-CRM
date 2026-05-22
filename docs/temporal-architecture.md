@@ -34,6 +34,7 @@ Replace ad hoc orchestration with durable workflow execution.
 - deterministic code controls execution, retries and idempotency
 - every external side effect must live inside an activity
 - no direct side effects from workflow code
+- persistence activities that also mirror into Notion need timeouts sized for external API latency
 
 ## Migration order
 

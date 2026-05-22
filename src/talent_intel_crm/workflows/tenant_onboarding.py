@@ -54,18 +54,6 @@ class TenantOnboardingWorkflow:
         tenant.tier = _normalize_tier(tenant.tier)
         info = workflow.info()
         await workflow.execute_activity(
-            record_workflow_run,
-            {
-                "tenant_id": tenant.tenant_id,
-                "workflow_name": "TenantOnboarding",
-                "workflow_id": info.workflow_id,
-                "run_id": info.run_id,
-                "status": "Running",
-                "payload": {"company_name": tenant.company_name},
-            },
-            schedule_to_close_timeout=timedelta(seconds=30),
-        )
-        await workflow.execute_activity(
             upsert_tenant_record,
             {
                 "tenant_id": tenant.tenant_id,
@@ -75,6 +63,18 @@ class TenantOnboardingWorkflow:
                 "primary_domain": tenant.primary_domain,
                 "timezone": tenant.timezone,
                 "metadata": {"phase": "tenant_onboarding"},
+            },
+            schedule_to_close_timeout=timedelta(seconds=30),
+        )
+        await workflow.execute_activity(
+            record_workflow_run,
+            {
+                "tenant_id": tenant.tenant_id,
+                "workflow_name": "TenantOnboarding",
+                "workflow_id": info.workflow_id,
+                "run_id": info.run_id,
+                "status": "Running",
+                "payload": {"company_name": tenant.company_name},
             },
             schedule_to_close_timeout=timedelta(seconds=30),
         )
