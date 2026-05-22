@@ -6,7 +6,7 @@ from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from talent_intel_crm.activities.email import send_initial_email
     from talent_intel_crm.activities.linkedin import enqueue_linkedin_message
-    from talent_intel_crm.activities.persistence import append_interaction, record_audit_event, upsert_candidate_record
+    from talent_intel_crm.activities.persistence import append_interaction, record_audit_event, record_workflow_run, upsert_candidate_record
     from talent_intel_crm.domain import CandidateChannel, CandidateEnvelope, CandidateStage
 
 
@@ -46,6 +46,21 @@ class CandidateLifecycleWorkflow:
     @workflow.run
     async def run(self, candidate: CandidateEnvelope) -> CandidateEnvelope:
         workflow.logger.info("Starting candidate lifecycle", extra={"candidate_id": candidate.candidate_id})
+        info = workflow.info()
+        await workflow.execute_activity(
+            record_workflow_run,
+            {
+                "tenant_id": candidate.tenant_id,
+                "candidate_id": candidate.candidate_id,
+                "workflow_name": "CandidateLifecycle",
+                "workflow_id": info.workflow_id,
+                "run_id": info.run_id,
+                "status": "Running",
+                "payload": {"stage": candidate.stage.value},
+            },
+            schedule_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
 
         candidate.stage = CandidateStage.INGESTED
         await workflow.execute_activity(
@@ -143,6 +158,21 @@ class CandidateLifecycleWorkflow:
                 "candidate_id": candidate.candidate_id,
                 "event_type": "candidate.lifecycle_completed",
                 "payload": {"stage": candidate.stage.value, "channels": [channel.value for channel in candidate.channels]},
+            },
+            schedule_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+        await workflow.execute_activity(
+            record_workflow_run,
+            {
+                "tenant_id": candidate.tenant_id,
+                "candidate_id": candidate.candidate_id,
+                "workflow_name": "CandidateLifecycle",
+                "workflow_id": info.workflow_id,
+                "run_id": info.run_id,
+                "status": "Completed",
+                "payload": {"stage": candidate.stage.value, "channels": [channel.value for channel in candidate.channels]},
+                "finished_at": workflow.now(),
             },
             schedule_to_close_timeout=timedelta(seconds=30),
             retry_policy=RetryPolicy(maximum_attempts=3),

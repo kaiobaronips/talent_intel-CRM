@@ -150,3 +150,38 @@ def append_audit_event(payload: dict[str, Any]) -> dict[str, Any]:
                 },
             )
             return dict(cur.fetchone() or {})
+
+
+def upsert_workflow_run(payload: dict[str, Any]) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute("create unique index if not exists idx_workflow_runs_run_id on workflow_runs (run_id)")
+            cur.execute(
+                """
+                insert into workflow_runs (
+                    tenant_id, candidate_id, workflow_name, workflow_id, run_id, status, payload_json, finished_at
+                ) values (
+                    %(tenant_id)s, %(candidate_id)s, %(workflow_name)s, %(workflow_id)s, %(run_id)s, %(status)s, %(payload_json)s::jsonb, %(finished_at)s
+                )
+                on conflict (run_id) do update set
+                    tenant_id = excluded.tenant_id,
+                    candidate_id = excluded.candidate_id,
+                    workflow_name = excluded.workflow_name,
+                    workflow_id = excluded.workflow_id,
+                    status = excluded.status,
+                    payload_json = excluded.payload_json,
+                    finished_at = excluded.finished_at
+                returning id, tenant_id, candidate_id, workflow_name, workflow_id, run_id, status, started_at, finished_at
+                """,
+                {
+                    "tenant_id": payload["tenant_id"],
+                    "candidate_id": payload.get("candidate_id"),
+                    "workflow_name": payload["workflow_name"],
+                    "workflow_id": payload["workflow_id"],
+                    "run_id": payload["run_id"],
+                    "status": payload["status"],
+                    "payload_json": json.dumps(payload.get("payload", {}), ensure_ascii=False),
+                    "finished_at": payload.get("finished_at"),
+                },
+            )
+            return dict(cur.fetchone() or {})
