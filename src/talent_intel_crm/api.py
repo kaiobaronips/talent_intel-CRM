@@ -10,7 +10,7 @@ from temporalio.exceptions import WorkflowAlreadyStartedError
 
 from talent_intel_crm.client import connect_temporal
 from talent_intel_crm.config import APIConfig, TemporalConfig
-from talent_intel_crm.db import tenant_exists
+from talent_intel_crm.db import get_candidate, get_tenant, list_candidate_interactions, tenant_exists
 from talent_intel_crm.domain import CandidateChannel, CandidateStage, TenantTier
 from talent_intel_crm.workflows import CandidateLifecycleWorkflow, TenantOnboardingWorkflow
 
@@ -98,6 +98,14 @@ async def create_tenant(payload: TenantCreateRequest) -> Dict[str, Any]:
     return _success({"workflow_id": handle.id, "run_id": handle.result_run_id, "tenant_id": payload.tenant_id})
 
 
+@app.get("/v1/tenants/{tenant_id}", dependencies=[Depends(_require_api_key)])
+async def read_tenant(tenant_id: str) -> Dict[str, Any]:
+    tenant = get_tenant(tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    return _success(tenant)
+
+
 @app.post("/v1/candidates", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(_require_api_key)])
 async def create_candidate(payload: CandidateCreateRequest) -> Dict[str, Any]:
     candidate_id = payload.candidate_id or f"candidate-{uuid4().hex}"
@@ -134,5 +142,26 @@ async def create_candidate(payload: CandidateCreateRequest) -> Dict[str, Any]:
             "candidate_id": candidate_id,
             "tenant_id": payload.tenant_id,
             "channels": channels,
+        }
+    )
+
+
+@app.get("/v1/candidates/{candidate_id}", dependencies=[Depends(_require_api_key)])
+async def read_candidate(candidate_id: str) -> Dict[str, Any]:
+    candidate = get_candidate(candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+    return _success(candidate)
+
+
+@app.get("/v1/candidates/{candidate_id}/interactions", dependencies=[Depends(_require_api_key)])
+async def read_candidate_interactions(candidate_id: str) -> Dict[str, Any]:
+    candidate = get_candidate(candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+    return _success(
+        {
+            "candidate_id": candidate_id,
+            "items": list_candidate_interactions(candidate_id),
         }
     )

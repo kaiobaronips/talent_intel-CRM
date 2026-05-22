@@ -70,6 +70,20 @@ def tenant_exists(tenant_id: str) -> bool:
             return cur.fetchone() is not None
 
 
+def get_tenant(tenant_id: str) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select id, slug, company_name, tier, primary_domain, timezone, metadata_json, created_at, updated_at
+                from tenants
+                where id = %s
+                """,
+                (tenant_id,),
+            )
+            return dict(cur.fetchone() or {})
+
+
 def upsert_candidate(payload: dict[str, Any]) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:
@@ -107,6 +121,36 @@ def upsert_candidate(payload: dict[str, Any]) -> dict[str, Any]:
                 },
             )
             return dict(cur.fetchone() or {})
+
+
+def get_candidate(candidate_id: str) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select id, tenant_id, external_id, name, city, email, linkedin_url, stage, source_page_id, metadata_json, created_at, updated_at
+                from candidates
+                where id = %s
+                """,
+                (candidate_id,),
+            )
+            return dict(cur.fetchone() or {})
+
+
+def list_candidate_interactions(candidate_id: str) -> list[dict[str, Any]]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select id, tenant_id, candidate_id, channel, message_type, status, provider_message_id,
+                    provider_thread_id, idempotency_key, payload_json, created_at
+                from interactions
+                where candidate_id = %s
+                order by created_at desc
+                """,
+                (candidate_id,),
+            )
+            return [dict(row) for row in cur.fetchall()]
 
 
 def append_interaction_row(payload: dict[str, Any]) -> dict[str, Any]:

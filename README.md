@@ -30,6 +30,7 @@ Separar a logica de negocio da execucao.
 ## Arquitetura SaaS
 
 Veja o blueprint completo em `docs/saas-architecture.md` e a camada Temporal em `docs/temporal-architecture.md`.
+Veja a separacao de processos em `docs/deployment.md`.
 
 ## Comandos iniciais
 
@@ -99,7 +100,23 @@ Interacoes criadas pelos workflows carregam uma chave estavel por candidato, can
 
 `POST /v1/tenants` dispara o onboarding do tenant e `POST /v1/candidates` dispara o lifecycle do candidato. As rotas retornam `202` com `workflow_id` e `run_id`; o progresso continua no Temporal e na persistencia. A rota de candidato exige que o tenant ja exista na persistencia.
 
-Defina `TICRM_API_KEY` para exigir `X-API-Key` nas rotas de escrita. `GET /health` fica aberto para probes do servico.
+Rotas de leitura:
+
+- `GET /v1/tenants/{tenant_id}`
+- `GET /v1/candidates/{candidate_id}`
+- `GET /v1/candidates/{candidate_id}/interactions`
+
+Defina `TICRM_API_KEY` para exigir `X-API-Key` nas rotas operacionais. `GET /health` fica aberto para probes do servico.
+
+## Processos de deploy
+
+API e worker rodam como servicos separados a partir da mesma base de codigo:
+
+```bash
+docker compose -f deploy/compose.yml up --build
+```
+
+Escale o worker separadamente da API conforme backlog e latencia das activities.
 
 ## Notion Mirror
 
