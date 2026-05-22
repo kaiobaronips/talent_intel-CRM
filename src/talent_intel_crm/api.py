@@ -5,14 +5,26 @@ import time
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
 from talent_intel_crm.auth import APIPrincipal, api_key_prefix, authorize_tenant, hash_api_key, new_tenant_api_key, require_admin, require_principal
 from talent_intel_crm.client import connect_temporal
 from talent_intel_crm.config import TemporalConfig
-from talent_intel_crm.db import database_ready, get_candidate, get_tenant, insert_tenant_api_key, list_candidate_interactions, tenant_exists
+from talent_intel_crm.db import (
+    database_ready,
+    get_candidate,
+    get_tenant,
+    insert_tenant_api_key,
+    list_candidate_interactions,
+    list_tenant_api_keys,
+    list_tenant_candidates,
+    list_tenant_interactions,
+    revoke_tenant_api_key,
+    tenant_exists,
+    tenant_metrics,
+)
 from talent_intel_crm.domain import CandidateChannel, CandidateStage, TenantTier
 from talent_intel_crm.workflows import CandidateLifecycleWorkflow, TenantOnboardingWorkflow
 
@@ -69,6 +81,18 @@ class TenantAPIKeyCreateRequest(BaseModel):
 
 def _success(data: Dict[str, Any]) -> Dict[str, Any]:
     return {"success": True, "data": data}
+
+
+def _page(items: List[Dict[str, Any]], page: int, limit: int, total: int) -> Dict[str, Any]:
+    return {
+        "items": items,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "pages": (total + limit - 1) // limit if total else 0,
+        },
+    }
 
 
 def _candidate_channels(payload: CandidateCreateRequest) -> List[str]:
@@ -155,6 +179,50 @@ async def create_tenant_api_key(
     return _success({"api_key": raw_key, "key": record})
 
 
+@app.get("/v1/tenants/{tenant_id}/api-keys")
+async def read_tenant_api_keys(tenant_id: str, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
+    require_admin(principal)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    return _success({"tenant_id": tenant_id, "items": list_tenant_api_keys(tenant_id)})
+
+
+@app.delete("/v1/tenants/{tenant_id}/api-keys/{api_key_id}")
+async def delete_tenant_api_key(
+    tenant_id: str,
+    api_key_id: str,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_admin(principal)
+    key = revoke_tenant_api_key(tenant_id, api_key_id)
+    if not key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active tenant API key not found")
+    return _success({"tenant_id": tenant_id, "key": key})
+
+
+@app.post("/v1/tenants/{tenant_id}/api-keys/{api_key_id}/rotate", status_code=status.HTTP_201_CREATED)
+async def rotate_tenant_api_key(
+    tenant_id: str,
+    api_key_id: str,
+    payload: TenantAPIKeyCreateRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_admin(principal)
+    revoked_key = revoke_tenant_api_key(tenant_id, api_key_id)
+    if not revoked_key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active tenant API key not found")
+    raw_key = new_tenant_api_key()
+    created_key = insert_tenant_api_key(
+        {
+            "tenant_id": tenant_id,
+            "key_prefix": api_key_prefix(raw_key),
+            "key_hash": hash_api_key(raw_key),
+            "label": payload.label,
+        }
+    )
+    return _success({"api_key": raw_key, "revoked_key": revoked_key, "key": created_key})
+
+
 @app.post("/v1/candidates", status_code=status.HTTP_202_ACCEPTED)
 async def create_candidate(payload: CandidateCreateRequest, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
     candidate_id = payload.candidate_id or f"candidate-{uuid4().hex}"
@@ -205,6 +273,20 @@ async def read_candidate(candidate_id: str, principal: APIPrincipal = Depends(re
     return _success(candidate)
 
 
+@app.get("/v1/tenants/{tenant_id}/candidates")
+async def read_tenant_candidates(
+    tenant_id: str,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    authorize_tenant(principal, tenant_id)
+    result = list_tenant_candidates(tenant_id, page, limit)
+    return _success({"tenant_id": tenant_id, **_page(result["items"], page, limit, result["total"])})
+
+
 @app.get("/v1/candidates/{candidate_id}/interactions")
 async def read_candidate_interactions(candidate_id: str, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
     candidate = get_candidate(candidate_id)
@@ -217,3 +299,25 @@ async def read_candidate_interactions(candidate_id: str, principal: APIPrincipal
             "items": list_candidate_interactions(candidate_id),
         }
     )
+
+
+@app.get("/v1/tenants/{tenant_id}/interactions")
+async def read_tenant_interactions(
+    tenant_id: str,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    authorize_tenant(principal, tenant_id)
+    result = list_tenant_interactions(tenant_id, page, limit)
+    return _success({"tenant_id": tenant_id, **_page(result["items"], page, limit, result["total"])})
+
+
+@app.get("/v1/tenants/{tenant_id}/metrics")
+async def read_tenant_metrics(tenant_id: str, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    authorize_tenant(principal, tenant_id)
+    return _success({"tenant_id": tenant_id, **tenant_metrics(tenant_id)})

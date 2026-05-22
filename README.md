@@ -103,9 +103,15 @@ Interacoes criadas pelos workflows carregam uma chave estavel por candidato, can
 Rotas de leitura:
 
 - `GET /v1/tenants/{tenant_id}`
+- `GET /v1/tenants/{tenant_id}/candidates?page=1&limit=20`
+- `GET /v1/tenants/{tenant_id}/interactions?page=1&limit=20`
+- `GET /v1/tenants/{tenant_id}/metrics`
 - `GET /v1/candidates/{candidate_id}`
 - `GET /v1/candidates/{candidate_id}/interactions`
 - `POST /v1/tenants/{tenant_id}/api-keys` using the admin key
+- `GET /v1/tenants/{tenant_id}/api-keys` using the admin key
+- `DELETE /v1/tenants/{tenant_id}/api-keys/{api_key_id}` using the admin key
+- `POST /v1/tenants/{tenant_id}/api-keys/{api_key_id}/rotate` using the admin key
 
 Defina `TICRM_ADMIN_API_KEY` e `TICRM_ALLOW_INSECURE_DEV_AUTH=false` para exigir `X-API-Key` nas rotas operacionais de producao. `GET /health` fica aberto para probes do servico. Chaves de tenant emitidas pela API ficam restritas ao tenant dono.
 

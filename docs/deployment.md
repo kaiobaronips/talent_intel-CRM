@@ -94,4 +94,12 @@ Inject production variables from the platform secrets manager. Use `deploy/produ
 - `TICRM_ADMIN_API_KEY` is environment-scoped and required for tenant onboarding and tenant key creation in production.
 - Tenant API keys are stored only as SHA-256 hashes in Postgres.
 - The raw tenant key is returned only once from `POST /v1/tenants/{tenant_id}/api-keys`.
+- Rotate a tenant key with `POST /v1/tenants/{tenant_id}/api-keys/{api_key_id}/rotate`; the old key is revoked before the new raw key is returned.
+- Revoke a tenant key with `DELETE /v1/tenants/{tenant_id}/api-keys/{api_key_id}`.
 - Tenant keys can only access candidates, interactions and tenant details owned by that tenant.
+
+## Metrics
+
+- Request logs include `X-Request-ID`, path, status and duration.
+- Worker activity logs emit structured metric events with `outcome`, duration and relevant tenant/channel/workflow fields.
+- `GET /v1/tenants/{tenant_id}/metrics` returns workflow run outcome counts, interaction counts and pending backlog grouped by channel from Postgres.

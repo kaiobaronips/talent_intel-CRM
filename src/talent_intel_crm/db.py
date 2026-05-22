@@ -124,6 +124,36 @@ def find_tenant_api_key(key_hash: str) -> dict[str, Any]:
             return dict(cur.fetchone() or {})
 
 
+def list_tenant_api_keys(tenant_id: str) -> list[dict[str, Any]]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select id, tenant_id, key_prefix, label, is_active, last_used_at, created_at, revoked_at
+                from tenant_api_keys
+                where tenant_id = %s
+                order by created_at desc
+                """,
+                (tenant_id,),
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+
+def revoke_tenant_api_key(tenant_id: str, api_key_id: str) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                update tenant_api_keys
+                set is_active = false, revoked_at = now()
+                where tenant_id = %s and id::text = %s and is_active = true
+                returning id, tenant_id, key_prefix, label, is_active, last_used_at, created_at, revoked_at
+                """,
+                (tenant_id, api_key_id),
+            )
+            return dict(cur.fetchone() or {})
+
+
 def upsert_candidate(payload: dict[str, Any]) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:
@@ -177,6 +207,26 @@ def get_candidate(candidate_id: str) -> dict[str, Any]:
             return dict(cur.fetchone() or {})
 
 
+def list_tenant_candidates(tenant_id: str, page: int, limit: int) -> dict[str, Any]:
+    offset = (page - 1) * limit
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute("select count(*) as total from candidates where tenant_id = %s", (tenant_id,))
+            total = int(cur.fetchone()["total"])
+            cur.execute(
+                """
+                select id, tenant_id, external_id, name, city, email, linkedin_url, stage, source_page_id,
+                    metadata_json, created_at, updated_at
+                from candidates
+                where tenant_id = %s
+                order by created_at desc, id desc
+                limit %s offset %s
+                """,
+                (tenant_id, limit, offset),
+            )
+            return {"items": [dict(row) for row in cur.fetchall()], "total": total}
+
+
 def list_candidate_interactions(candidate_id: str) -> list[dict[str, Any]]:
     with get_connection() as connection:
         with connection.cursor() as cur:
@@ -193,6 +243,68 @@ def list_candidate_interactions(candidate_id: str) -> list[dict[str, Any]]:
             return [dict(row) for row in cur.fetchall()]
 
 
+def list_tenant_interactions(tenant_id: str, page: int, limit: int) -> dict[str, Any]:
+    offset = (page - 1) * limit
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute("select count(*) as total from interactions where tenant_id = %s", (tenant_id,))
+            total = int(cur.fetchone()["total"])
+            cur.execute(
+                """
+                select id, tenant_id, candidate_id, channel, message_type, status, provider_message_id,
+                    provider_thread_id, idempotency_key, payload_json, created_at
+                from interactions
+                where tenant_id = %s
+                order by created_at desc, id desc
+                limit %s offset %s
+                """,
+                (tenant_id, limit, offset),
+            )
+            return {"items": [dict(row) for row in cur.fetchall()], "total": total}
+
+
+def tenant_metrics(tenant_id: str) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select
+                    count(*) filter (where status = 'Completed') as completed,
+                    count(*) filter (where status = 'Running') as running,
+                    count(*) filter (where status not in ('Completed', 'Running')) as other
+                from workflow_runs
+                where tenant_id = %s
+                """,
+                (tenant_id,),
+            )
+            workflow_runs = dict(cur.fetchone() or {})
+            cur.execute(
+                """
+                select channel, status, count(*) as total
+                from interactions
+                where tenant_id = %s
+                group by channel, status
+                order by channel, status
+                """,
+                (tenant_id,),
+            )
+            interaction_counts = [dict(row) for row in cur.fetchall()]
+            cur.execute(
+                """
+                select channel, count(*) as pending
+                from interactions
+                where tenant_id = %s and status = 'pending'
+                group by channel
+                order by channel
+                """,
+                (tenant_id,),
+            )
+            channel_backlog = [dict(row) for row in cur.fetchall()]
+            return {
+                "workflow_runs": workflow_runs,
+                "interaction_counts": interaction_counts,
+                "channel_backlog": channel_backlog,
+            }
 def append_interaction_row(payload: dict[str, Any]) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:

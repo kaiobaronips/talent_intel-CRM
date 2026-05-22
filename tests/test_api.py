@@ -134,3 +134,45 @@ def test_create_tenant_key_returns_raw_key_once(monkeypatch) -> None:
     assert response.status_code == 201
     assert response.json()["data"]["api_key"] == "ticrm_raw-tenant-key"
     assert "key_hash" not in response.json()["data"]["key"]
+
+
+def test_tenant_key_lifecycle_routes(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "list_tenant_api_keys", lambda _tenant_id: [{"id": "key-001", "is_active": True}])
+    monkeypatch.setattr(api, "revoke_tenant_api_key", lambda _tenant_id, key_id: {"id": key_id, "is_active": False})
+    monkeypatch.setattr(api, "new_tenant_api_key", lambda: "ticrm_rotated-key")
+    monkeypatch.setattr(api, "insert_tenant_api_key", lambda payload: {"id": "key-002", "key_prefix": payload["key_prefix"]})
+    client = TestClient(api.app)
+
+    listed = client.get("/v1/tenants/tenant-001/api-keys")
+    revoked = client.delete("/v1/tenants/tenant-001/api-keys/key-001")
+    rotated = client.post("/v1/tenants/tenant-001/api-keys/key-001/rotate", json={"label": "rotated"})
+
+    assert listed.json()["data"]["items"][0]["id"] == "key-001"
+    assert revoked.json()["data"]["key"]["is_active"] is False
+    assert rotated.status_code == 201
+    assert rotated.json()["data"]["api_key"] == "ticrm_rotated-key"
+
+
+def test_tenant_pagination_and_metrics_routes(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "list_tenant_candidates", lambda _tenant_id, _page, _limit: {"items": [{"id": "cand-1"}], "total": 11})
+    monkeypatch.setattr(api, "list_tenant_interactions", lambda _tenant_id, _page, _limit: {"items": [{"id": "int-1"}], "total": 1})
+    monkeypatch.setattr(
+        api,
+        "tenant_metrics",
+        lambda _tenant_id: {
+            "workflow_runs": {"completed": 2, "running": 1, "other": 0},
+            "interaction_counts": [{"channel": "email", "status": "pending", "total": 1}],
+            "channel_backlog": [{"channel": "email", "pending": 1}],
+        },
+    )
+    client = TestClient(api.app)
+
+    candidates = client.get("/v1/tenants/tenant-001/candidates?page=2&limit=10")
+    interactions = client.get("/v1/tenants/tenant-001/interactions?page=1&limit=5")
+    metrics = client.get("/v1/tenants/tenant-001/metrics")
+
+    assert candidates.json()["data"]["pagination"] == {"page": 2, "limit": 10, "total": 11, "pages": 2}
+    assert interactions.json()["data"]["items"] == [{"id": "int-1"}]
+    assert metrics.json()["data"]["channel_backlog"] == [{"channel": "email", "pending": 1}]
