@@ -1,10 +1,12 @@
 from datetime import timedelta
+from typing import Any, Dict
 
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from talent_intel_crm.activities.persistence import record_audit_event, record_workflow_run, upsert_candidate_record
-    from talent_intel_crm.domain import CandidateEnvelope, CandidateStage
+    from talent_intel_crm.candidate_payload import candidate_from_input, candidate_record, candidate_result
+    from talent_intel_crm.domain import CandidateStage
 
 
 @workflow.defn
@@ -12,7 +14,8 @@ class CandidateEnrichmentWorkflow:
     """Coordinates enrichment through external providers and internal rules."""
 
     @workflow.run
-    async def run(self, candidate: CandidateEnvelope) -> CandidateEnvelope:
+    async def run(self, candidate: Dict[str, Any]) -> Dict[str, Any]:
+        candidate = candidate_from_input(candidate)
         workflow.logger.info("Enriching candidate", extra={"candidate_id": candidate.candidate_id})
         info = workflow.info()
         await workflow.execute_activity(
@@ -30,18 +33,7 @@ class CandidateEnrichmentWorkflow:
         candidate.stage = CandidateStage.ENRICHED
         await workflow.execute_activity(
             upsert_candidate_record,
-            {
-                "candidate_id": candidate.candidate_id,
-                "tenant_id": candidate.tenant_id,
-                "name": candidate.name,
-                "city": candidate.city,
-                "email": candidate.email,
-                "linkedin_url": candidate.linkedin_url,
-                "stage": candidate.stage.value,
-                "channels": [channel.value for channel in candidate.channels],
-                "source_page_id": candidate.source_page_id,
-                "phase": "enrichment",
-            },
+            candidate_record(candidate, candidate.stage, phase="enrichment"),
             schedule_to_close_timeout=timedelta(seconds=30),
         )
         await workflow.execute_activity(
@@ -68,4 +60,4 @@ class CandidateEnrichmentWorkflow:
             },
             schedule_to_close_timeout=timedelta(seconds=30),
         )
-        return candidate
+        return candidate_result(candidate)

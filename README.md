@@ -43,6 +43,7 @@ Para disparos controlados:
 python -m talent_intel_crm.runner smoke
 python -m talent_intel_crm.runner tenant-onboarding --tenant-id acme --company-name "Acme RH"
 python -m talent_intel_crm.runner candidate-lifecycle --tenant-id acme --candidate-id cand-001 --name "Jane Doe" --email jane@example.com --channels email linkedin
+python -m talent_intel_crm.runner candidate-step --step outreach --tenant-id acme --candidate-id cand-001 --name "Jane Doe" --email jane@example.com --linkedin-url https://www.linkedin.com/in/jane-doe --channels email linkedin --stage qualified
 ```
 
 O worker ja roda com uma camada de persistencia em Postgres; o proximo passo e apontar `SUPABASE_DB_URL`, os canais reais de envio e, opcionalmente, o espelhamento visual no Notion.

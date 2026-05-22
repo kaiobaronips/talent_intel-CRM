@@ -1,10 +1,12 @@
 from datetime import timedelta
+from typing import Any, Dict
 
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from talent_intel_crm.activities.persistence import append_interaction, record_audit_event, record_workflow_run, upsert_candidate_record
-    from talent_intel_crm.domain import CandidateEnvelope, CandidateStage
+    from talent_intel_crm.candidate_payload import candidate_from_input, candidate_record, candidate_result, interaction_record
+    from talent_intel_crm.domain import CandidateStage
 
 
 @workflow.defn
@@ -12,7 +14,8 @@ class CandidateFollowUpWorkflow:
     """Owns the retry-safe follow-up cadence."""
 
     @workflow.run
-    async def run(self, candidate: CandidateEnvelope) -> CandidateEnvelope:
+    async def run(self, candidate: Dict[str, Any]) -> Dict[str, Any]:
+        candidate = candidate_from_input(candidate)
         workflow.logger.info("Scheduling follow-up", extra={"candidate_id": candidate.candidate_id})
         info = workflow.info()
         await workflow.execute_activity(
@@ -30,32 +33,15 @@ class CandidateFollowUpWorkflow:
         candidate.stage = CandidateStage.FOLLOW_UP
         await workflow.execute_activity(
             upsert_candidate_record,
-            {
-                "candidate_id": candidate.candidate_id,
-                "tenant_id": candidate.tenant_id,
-                "name": candidate.name,
-                "city": candidate.city,
-                "email": candidate.email,
-                "linkedin_url": candidate.linkedin_url,
-                "stage": candidate.stage.value,
-                "channels": [channel.value for channel in candidate.channels],
-                "source_page_id": candidate.source_page_id,
-                "phase": "follow_up",
-            },
+            candidate_record(candidate, candidate.stage, phase="follow_up"),
             schedule_to_close_timeout=timedelta(seconds=30),
         )
-        await workflow.execute_activity(
-            append_interaction,
-            {
-                "candidate_id": candidate.candidate_id,
-                "tenant_id": candidate.tenant_id,
-                "name": candidate.name,
-                "message_type": "follow_up",
-                "stage": candidate.stage.value,
-                "source_page_id": candidate.source_page_id,
-            },
-            schedule_to_close_timeout=timedelta(seconds=30),
-        )
+        for channel in candidate.channels:
+            await workflow.execute_activity(
+                append_interaction,
+                interaction_record(candidate, channel, "follow_up"),
+                schedule_to_close_timeout=timedelta(seconds=30),
+            )
         await workflow.execute_activity(
             record_audit_event,
             {
@@ -80,4 +66,4 @@ class CandidateFollowUpWorkflow:
             },
             schedule_to_close_timeout=timedelta(seconds=30),
         )
-        return candidate
+        return candidate_result(candidate)

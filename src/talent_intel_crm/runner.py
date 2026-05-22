@@ -5,8 +5,27 @@ import asyncio
 import uuid
 
 from talent_intel_crm.client import connect_temporal
-from talent_intel_crm.domain import CandidateChannel, TenantTier
-from talent_intel_crm.workflows import CandidateLifecycleWorkflow, TenantOnboardingWorkflow
+from talent_intel_crm.domain import CandidateChannel, CandidateStage, TenantTier
+from talent_intel_crm.workflows import (
+    CandidateClosureWorkflow,
+    CandidateEnrichmentWorkflow,
+    CandidateFollowUpWorkflow,
+    CandidateIngestWorkflow,
+    CandidateLifecycleWorkflow,
+    CandidateOutreachWorkflow,
+    CandidateQualificationWorkflow,
+    TenantOnboardingWorkflow,
+)
+
+
+STEP_WORKFLOWS = {
+    "ingest": CandidateIngestWorkflow,
+    "enrichment": CandidateEnrichmentWorkflow,
+    "qualification": CandidateQualificationWorkflow,
+    "outreach": CandidateOutreachWorkflow,
+    "follow-up": CandidateFollowUpWorkflow,
+    "closure": CandidateClosureWorkflow,
+}
 
 
 def _stage_value(value: object) -> str:
@@ -30,6 +49,35 @@ def _result_value(result: object, key: str) -> object:
     return getattr(result, key, "")
 
 
+def _add_candidate_arguments(parser: argparse.ArgumentParser, include_stage: bool = False) -> None:
+    parser.add_argument("--candidate-id", required=True)
+    parser.add_argument("--tenant-id", required=True)
+    parser.add_argument("--name", required=True)
+    parser.add_argument("--city", default="")
+    parser.add_argument("--email", default="")
+    parser.add_argument("--linkedin-url", default="")
+    parser.add_argument("--channels", nargs="*", choices=[channel.value for channel in CandidateChannel], default=[])
+    parser.add_argument("--source-page-id", default="")
+    if include_stage:
+        parser.add_argument("--stage", choices=[stage.value for stage in CandidateStage], default=CandidateStage.INGESTED.value)
+
+
+def _candidate_payload(args: argparse.Namespace) -> dict[str, object]:
+    payload = {
+        "candidate_id": args.candidate_id,
+        "tenant_id": args.tenant_id,
+        "name": args.name,
+        "city": args.city,
+        "email": args.email,
+        "linkedin_url": args.linkedin_url,
+        "channels": list(args.channels),
+        "source_page_id": args.source_page_id or None,
+    }
+    if getattr(args, "stage", ""):
+        payload["stage"] = args.stage
+    return payload
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Controlled workflow runner for Talent Intel CRM")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -42,14 +90,11 @@ def _build_parser() -> argparse.ArgumentParser:
     tenant.add_argument("--timezone", default="America/Sao_Paulo")
 
     candidate = sub.add_parser("candidate-lifecycle")
-    candidate.add_argument("--candidate-id", required=True)
-    candidate.add_argument("--tenant-id", required=True)
-    candidate.add_argument("--name", required=True)
-    candidate.add_argument("--city", default="")
-    candidate.add_argument("--email", default="")
-    candidate.add_argument("--linkedin-url", default="")
-    candidate.add_argument("--channels", nargs="*", choices=[channel.value for channel in CandidateChannel], default=[])
-    candidate.add_argument("--source-page-id", default="")
+    _add_candidate_arguments(candidate)
+
+    step = sub.add_parser("candidate-step")
+    step.add_argument("--step", choices=sorted(STEP_WORKFLOWS), required=True)
+    _add_candidate_arguments(step, include_stage=True)
 
     smoke = sub.add_parser("smoke")
     smoke.add_argument("--tenant-id", default="talent-intel-crm")
@@ -84,16 +129,7 @@ async def _run(args: argparse.Namespace) -> None:
         return
 
     if args.command == "candidate-lifecycle":
-        payload = {
-            "candidate_id": args.candidate_id,
-            "tenant_id": args.tenant_id,
-            "name": args.name,
-            "city": args.city,
-            "email": args.email,
-            "linkedin_url": args.linkedin_url,
-            "channels": list(args.channels),
-            "source_page_id": args.source_page_id or None,
-        }
+        payload = _candidate_payload(args)
         handle = await client.start_workflow(
             CandidateLifecycleWorkflow.run,
             payload,
@@ -105,6 +141,27 @@ async def _run(args: argparse.Namespace) -> None:
             {
                 "workflow_id": handle.id,
                 "run_id": handle.result_run_id,
+                "candidate_id": _result_value(result, "candidate_id"),
+                "stage": _stage_value(_result_value(result, "stage")),
+                "channels": _channel_values(_result_value(result, "channels")),
+            }
+        )
+        return
+
+    if args.command == "candidate-step":
+        workflow_type = STEP_WORKFLOWS[args.step]
+        handle = await client.start_workflow(
+            workflow_type.run,
+            _candidate_payload(args),
+            id=f"candidate-{args.step}::{args.tenant_id}::{args.candidate_id}::{uuid.uuid4().hex[:8]}",
+            task_queue="talent-intel-crm",
+        )
+        result = await handle.result()
+        print(
+            {
+                "workflow_id": handle.id,
+                "run_id": handle.result_run_id,
+                "step": args.step,
                 "candidate_id": _result_value(result, "candidate_id"),
                 "stage": _stage_value(_result_value(result, "stage")),
                 "channels": _channel_values(_result_value(result, "channels")),
