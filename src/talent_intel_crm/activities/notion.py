@@ -155,6 +155,7 @@ def sync_candidate_record(payload: dict[str, Any], postgres_result: dict[str, An
     properties = {
         "Name": _title(payload["name"]),
         "Tenant ID": _rich_text(payload["tenant_id"]),
+        "Candidate ID": _rich_text(payload["candidate_id"]),
         "Primary Email": _email(payload.get("email", "")),
         "Primary Phone": _phone(metadata.get("phone", "")),
         "LinkedIn URL": _url(payload.get("linkedin_url", "")),
@@ -173,12 +174,9 @@ def sync_candidate_record(payload: dict[str, Any], postgres_result: dict[str, An
     }
     result = _upsert_page(
         data_source_id=config.candidates_data_source_id,
-        external_property_name="Tenant ID",
-        external_property_value=payload["tenant_id"],
-        properties={
-            **properties,
-            "Tenant ID": _rich_text(f'{payload["tenant_id"]}:{payload["candidate_id"]}'),
-        },
+        external_property_name="Candidate ID",
+        external_property_value=payload["candidate_id"],
+        properties=properties,
     )
     return action_result("notion.sync_candidate_record", payload, "notion", True, result)
 
@@ -191,6 +189,7 @@ def sync_interaction_record(payload: dict[str, Any], postgres_result: dict[str, 
         "Name": _title(f'{payload.get("name", payload["candidate_id"])} - {payload.get("channel", "").title()}'),
         "Tenant ID": _rich_text(payload["tenant_id"]),
         "Candidate ID": _rich_text(payload["candidate_id"]),
+        "Interaction ID": _rich_text(str(postgres_result.get("id", ""))),
         "Channel": _select((payload.get("channel") or "").capitalize()),
         "Interaction": _select(payload.get("interaction", "Queued")),
         "Next Action": _select(payload.get("next_action", "Awaiting execution")),
@@ -202,12 +201,9 @@ def sync_interaction_record(payload: dict[str, Any], postgres_result: dict[str, 
     }
     result = _upsert_page(
         data_source_id=config.interactions_data_source_id,
-        external_property_name="Candidate ID",
-        external_property_value=f'{payload["candidate_id"]}:{postgres_result.get("id", "")}',
-        properties={
-            **properties,
-            "Candidate ID": _rich_text(f'{payload["candidate_id"]}:{postgres_result.get("id", "")}'),
-        },
+        external_property_name="Interaction ID",
+        external_property_value=str(postgres_result.get("id", "")),
+        properties=properties,
     )
     return action_result("notion.sync_interaction_record", payload, "notion", True, result)
 
@@ -243,6 +239,7 @@ def sync_audit_event_record(payload: dict[str, Any], postgres_result: dict[str, 
     properties = {
         "Name": _title(payload["event_type"]),
         "Tenant ID": _rich_text(payload["tenant_id"]),
+        "Audit Event ID": _rich_text(str(postgres_result.get("id", ""))),
         "Entity Type": _select(payload.get("entity_type", "System")),
         "Entity ID": _rich_text(payload.get("entity_id") or payload.get("candidate_id", "")),
         "Event Type": _rich_text(payload["event_type"]),
@@ -253,11 +250,8 @@ def sync_audit_event_record(payload: dict[str, Any], postgres_result: dict[str, 
     }
     result = _upsert_page(
         data_source_id=config.audit_events_data_source_id,
-        external_property_name="Entity ID",
-        external_property_value=f'{payload.get("event_type")}:{postgres_result.get("id", "")}',
-        properties={
-            **properties,
-            "Entity ID": _rich_text(f'{payload.get("event_type")}:{postgres_result.get("id", "")}'),
-        },
+        external_property_name="Audit Event ID",
+        external_property_value=str(postgres_result.get("id", "")),
+        properties=properties,
     )
     return action_result("notion.sync_audit_event_record", payload, "notion", True, result)
