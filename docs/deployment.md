@@ -60,7 +60,8 @@ Both process types need Temporal connection variables. API reads also need the S
 
 API protection:
 
-- `TICRM_API_KEY`
+- `TICRM_ADMIN_API_KEY`
+- `TICRM_ALLOW_INSECURE_DEV_AUTH=false`
 
 Worker side effects:
 
@@ -71,3 +72,26 @@ Worker side effects:
 ## Production split
 
 Deploy `api` and `worker` as separate services from the same image. Do not tie worker availability to HTTP autoscaling: Temporal backlog and activity latency control worker scaling, while request rate controls API scaling.
+
+Run migrations before API/worker rollout:
+
+```bash
+ticrm-migrate status
+ticrm-migrate apply
+```
+
+Container example:
+
+```bash
+docker compose --profile ops -f deploy/compose.production.yml run --rm migrate
+docker compose -f deploy/compose.production.yml up -d api worker
+```
+
+Inject production variables from the platform secrets manager. Use `deploy/production.env.example` only as the variable contract, not as secret storage.
+
+## API keys
+
+- `TICRM_ADMIN_API_KEY` is environment-scoped and required for tenant onboarding and tenant key creation in production.
+- Tenant API keys are stored only as SHA-256 hashes in Postgres.
+- The raw tenant key is returned only once from `POST /v1/tenants/{tenant_id}/api-keys`.
+- Tenant keys can only access candidates, interactions and tenant details owned by that tenant.

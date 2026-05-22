@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fastapi.testclient import TestClient
+import pytest
 
 from talent_intel_crm import api
+from talent_intel_crm.auth import APIPrincipal
 
 
 @dataclass
@@ -19,11 +21,27 @@ class FakeTemporalClient:
         return FakeHandle(id=id)
 
 
+@pytest.fixture(autouse=True)
+def admin_principal_override():
+    api.app.dependency_overrides[api.require_principal] = lambda: APIPrincipal(role="admin")
+    yield
+    api.app.dependency_overrides.clear()
+
+
 def test_health_is_open() -> None:
     response = TestClient(api.app).get("/health")
 
     assert response.status_code == 200
     assert response.json()["success"] is True
+
+
+def test_readiness_reports_database_state(monkeypatch) -> None:
+    monkeypatch.setattr(api, "database_ready", lambda: False)
+
+    response = TestClient(api.app).get("/ready")
+
+    assert response.status_code == 503
+    assert response.json()["data"]["postgres"] is False
 
 
 def test_create_candidate_rejects_missing_channel() -> None:
@@ -94,3 +112,25 @@ def test_read_routes_return_not_found(monkeypatch) -> None:
     assert client.get("/v1/tenants/missing").status_code == 404
     assert client.get("/v1/candidates/missing").status_code == 404
     assert client.get("/v1/candidates/missing/interactions").status_code == 404
+
+
+def test_create_tenant_key_returns_raw_key_once(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "new_tenant_api_key", lambda: "ticrm_raw-tenant-key")
+    monkeypatch.setattr(
+        api,
+        "insert_tenant_api_key",
+        lambda payload: {
+            "id": "key-001",
+            "tenant_id": payload["tenant_id"],
+            "key_prefix": payload["key_prefix"],
+            "label": payload["label"],
+        },
+    )
+    client = TestClient(api.app)
+
+    response = client.post("/v1/tenants/tenant-001/api-keys", json={"label": "primary"})
+
+    assert response.status_code == 201
+    assert response.json()["data"]["api_key"] == "ticrm_raw-tenant-key"
+    assert "key_hash" not in response.json()["data"]["key"]

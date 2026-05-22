@@ -105,8 +105,9 @@ Rotas de leitura:
 - `GET /v1/tenants/{tenant_id}`
 - `GET /v1/candidates/{candidate_id}`
 - `GET /v1/candidates/{candidate_id}/interactions`
+- `POST /v1/tenants/{tenant_id}/api-keys` using the admin key
 
-Defina `TICRM_API_KEY` para exigir `X-API-Key` nas rotas operacionais. `GET /health` fica aberto para probes do servico.
+Defina `TICRM_ADMIN_API_KEY` e `TICRM_ALLOW_INSECURE_DEV_AUTH=false` para exigir `X-API-Key` nas rotas operacionais de producao. `GET /health` fica aberto para probes do servico. Chaves de tenant emitidas pela API ficam restritas ao tenant dono.
 
 ## Processos de deploy
 
@@ -117,6 +118,13 @@ docker compose -f deploy/compose.yml up --build
 ```
 
 Escale o worker separadamente da API conforme backlog e latencia das activities.
+
+Migrations versionadas:
+
+```bash
+ticrm-migrate status
+ticrm-migrate apply
+```
 
 ## Notion Mirror
 

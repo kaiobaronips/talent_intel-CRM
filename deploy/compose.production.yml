@@ -1,0 +1,48 @@
+services:
+  api:
+    image: ${TICRM_IMAGE}
+    command: ["uvicorn", "talent_intel_crm.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TEMPORAL_TARGET_HOST: ${TEMPORAL_TARGET_HOST}
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE}
+      TEMPORAL_API_KEY: ${TEMPORAL_API_KEY}
+      TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE}
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+      TICRM_ADMIN_API_KEY: ${TICRM_ADMIN_API_KEY}
+      TICRM_ALLOW_INSECURE_DEV_AUTH: "false"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  worker:
+    image: ${TICRM_IMAGE}
+    command: ["python", "-m", "talent_intel_crm.worker"]
+    environment:
+      TEMPORAL_TARGET_HOST: ${TEMPORAL_TARGET_HOST}
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE}
+      TEMPORAL_API_KEY: ${TEMPORAL_API_KEY}
+      TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE}
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+      EMAIL_SEND_WEBHOOK_URL: ${EMAIL_SEND_WEBHOOK_URL}
+      LINKEDIN_SEND_WEBHOOK_URL: ${LINKEDIN_SEND_WEBHOOK_URL}
+      NOTION_MIRROR_API_TOKEN: ${NOTION_MIRROR_API_TOKEN}
+      NOTION_MIRROR_API_VERSION: ${NOTION_MIRROR_API_VERSION}
+      NOTION_MIRROR_TENANTS_DATA_SOURCE_ID: ${NOTION_MIRROR_TENANTS_DATA_SOURCE_ID}
+      NOTION_MIRROR_CANDIDATES_DATA_SOURCE_ID: ${NOTION_MIRROR_CANDIDATES_DATA_SOURCE_ID}
+      NOTION_MIRROR_INTERACTIONS_DATA_SOURCE_ID: ${NOTION_MIRROR_INTERACTIONS_DATA_SOURCE_ID}
+      NOTION_MIRROR_WORKFLOW_RUNS_DATA_SOURCE_ID: ${NOTION_MIRROR_WORKFLOW_RUNS_DATA_SOURCE_ID}
+      NOTION_MIRROR_AUDIT_EVENTS_DATA_SOURCE_ID: ${NOTION_MIRROR_AUDIT_EVENTS_DATA_SOURCE_ID}
+    restart: unless-stopped
+
+  migrate:
+    image: ${TICRM_IMAGE}
+    command: ["ticrm-migrate", "apply"]
+    environment:
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+    profiles:
+      - ops

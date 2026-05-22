@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from contextlib import contextmanager
 from typing import Any, Iterator
 
@@ -28,6 +29,16 @@ def get_connection() -> Iterator[psycopg.Connection[Any]]:
         raise
     finally:
         connection.close()
+
+
+def database_ready() -> bool:
+    try:
+        with get_connection() as connection:
+            with connection.cursor() as cur:
+                cur.execute("select 1 as ready")
+                return bool(cur.fetchone())
+    except Exception:
+        return False
 
 
 def upsert_tenant(payload: dict[str, Any]) -> dict[str, Any]:
@@ -80,6 +91,35 @@ def get_tenant(tenant_id: str) -> dict[str, Any]:
                 where id = %s
                 """,
                 (tenant_id,),
+            )
+            return dict(cur.fetchone() or {})
+
+
+def insert_tenant_api_key(payload: dict[str, Any]) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                insert into tenant_api_keys (tenant_id, key_prefix, key_hash, label)
+                values (%(tenant_id)s, %(key_prefix)s, %(key_hash)s, %(label)s)
+                returning id, tenant_id, key_prefix, label, is_active, created_at
+                """,
+                payload,
+            )
+            return dict(cur.fetchone() or {})
+
+
+def find_tenant_api_key(key_hash: str) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                update tenant_api_keys
+                set last_used_at = %s
+                where key_hash = %s and is_active = true and revoked_at is null
+                returning id, tenant_id, key_prefix, label, is_active
+                """,
+                (datetime.now(timezone.utc), key_hash),
             )
             return dict(cur.fetchone() or {})
 

@@ -20,7 +20,8 @@ class TemporalConfig:
 
 @dataclass(frozen=True)
 class APIConfig:
-    api_key: Optional[str] = os.getenv("TICRM_API_KEY") or None
+    admin_api_key: Optional[str] = os.getenv("TICRM_ADMIN_API_KEY") or os.getenv("TICRM_API_KEY") or None
+    allow_insecure_development_auth: bool = os.getenv("TICRM_ALLOW_INSECURE_DEV_AUTH", "false").lower() in {"1", "true", "yes"}
 
 
 @dataclass(frozen=True)
