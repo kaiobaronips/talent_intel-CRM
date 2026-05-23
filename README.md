@@ -183,3 +183,13 @@ A API expoe `GET /v1/me` para a UI identificar se a chave atual e `admin` ou `te
 ## Operational Audit
 
 A API expoe `GET /v1/tenants/{tenant_id}/audit-events` e a UI possui `/audit` para visualizar eventos recentes por tenant. Use essa tela para investigar execucoes de workflow, eventos de lifecycle e acoes automaticas antes de operar em producao.
+
+## Production Readiness Check
+
+Antes de deploy/staging, rode:
+
+```bash
+make prod-readiness
+```
+
+O comando valida variaveis obrigatorias sem imprimir valores sensiveis e bloqueia producao com `TICRM_ALLOW_INSECURE_DEV_AUTH=true`.

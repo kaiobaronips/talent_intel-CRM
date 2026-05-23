@@ -22,3 +22,6 @@ smoke-api:
 
 prepare-web-env:
 	python3 scripts/prepare_web_env.py
+
+prod-readiness:
+	python3 scripts/check_production_readiness.py
