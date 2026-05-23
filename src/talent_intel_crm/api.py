@@ -24,6 +24,7 @@ from talent_intel_crm.db import (
     list_tenant_candidates,
     list_tenant_interactions,
     list_tenant_memberships,
+    list_tenant_workflow_runs,
     revoke_tenant_api_key,
     tenant_exists,
     tenant_metrics,
@@ -376,6 +377,20 @@ async def read_tenant_interactions(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     authorize_tenant(principal, tenant_id)
     result = list_tenant_interactions(tenant_id, page, limit)
+    return _success({"tenant_id": tenant_id, **_page(result["items"], page, limit, result["total"])})
+
+
+@app.get("/v1/tenants/{tenant_id}/workflow-runs")
+async def read_tenant_workflow_runs(
+    tenant_id: str,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    authorize_tenant(principal, tenant_id)
+    result = list_tenant_workflow_runs(tenant_id, page, limit)
     return _success({"tenant_id": tenant_id, **_page(result["items"], page, limit, result["total"])})
 
 

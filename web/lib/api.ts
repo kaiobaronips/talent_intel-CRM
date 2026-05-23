@@ -1,5 +1,5 @@
-import { defaultTenantId, fallbackApiKeys, fallbackAuditEvents, fallbackCandidates, fallbackInteractions, fallbackMemberships, fallbackMetrics, fallbackTenant } from './fallbacks';
-import type { ApiKey, ApiResult, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMembership, TenantMetrics } from './types';
+import { defaultTenantId, fallbackApiKeys, fallbackAuditEvents, fallbackCandidates, fallbackInteractions, fallbackMemberships, fallbackMetrics, fallbackTenant, fallbackWorkflowRuns } from './fallbacks';
+import type { ApiKey, ApiResult, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMembership, TenantMetrics, WorkflowRun } from './types';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_TICRM_API_URL ?? 'http://localhost:8000';
 const apiKey = process.env.TICRM_API_KEY;
@@ -108,6 +108,10 @@ export function getDefaultTenantId(): string {
 
 export async function getTenant(tenantId = defaultTenantId): Promise<ApiResult<Tenant>> {
   return apiGetRaw<Tenant>(`/v1/tenants/${tenantId}`, fallbackTenant);
+}
+
+export async function getWorkflowRuns(tenantId = defaultTenantId, limit = 20): Promise<ApiResult<Paginated<WorkflowRun>>> {
+  return apiGetRaw<Paginated<WorkflowRun>>(`/v1/tenants/${tenantId}/workflow-runs?page=1&limit=${limit}`, fallbackWorkflowRuns);
 }
 
 export async function getAuditEvents(tenantId = defaultTenantId, limit = 20): Promise<ApiResult<Paginated<AuditEvent>>> {

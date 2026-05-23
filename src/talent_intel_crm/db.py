@@ -353,6 +353,25 @@ def tenant_metrics(tenant_id: str) -> dict[str, Any]:
                 "channel_backlog": channel_backlog,
             }
 
+def list_tenant_workflow_runs(tenant_id: str, page: int, limit: int) -> dict[str, Any]:
+    offset = (page - 1) * limit
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute("select count(*) as total from workflow_runs where tenant_id = %s", (tenant_id,))
+            total = int(cur.fetchone()["total"])
+            cur.execute(
+                """
+                select id, tenant_id, candidate_id, workflow_name, workflow_id, run_id, status, payload_json, started_at, finished_at
+                from workflow_runs
+                where tenant_id = %s
+                order by started_at desc, id desc
+                limit %s offset %s
+                """,
+                (tenant_id, limit, offset),
+            )
+            return {"items": [dict(row) for row in cur.fetchall()], "total": total}
+
+
 def list_tenant_audit_events(tenant_id: str, page: int, limit: int) -> dict[str, Any]:
     offset = (page - 1) * limit
     with get_connection() as connection:

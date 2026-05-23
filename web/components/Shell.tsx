@@ -9,6 +9,7 @@ const navItems = [
   { href: '/candidates', label: 'Candidatos' },
   { href: '/interactions', label: 'Interacoes' },
   { href: '/members', label: 'Membros' },
+  { href: '/workflows', label: 'Workflows' },
   { href: '/audit', label: 'Auditoria' },
   { href: '/system', label: 'System' },
 ];

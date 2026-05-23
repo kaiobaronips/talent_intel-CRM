@@ -194,6 +194,7 @@ def test_tenant_pagination_and_metrics_routes(monkeypatch) -> None:
     monkeypatch.setattr(api, "list_tenant_candidates", lambda _tenant_id, _page, _limit: {"items": [{"id": "cand-1"}], "total": 11})
     monkeypatch.setattr(api, "list_tenant_interactions", lambda _tenant_id, _page, _limit: {"items": [{"id": "int-1"}], "total": 1})
     monkeypatch.setattr(api, "list_tenant_audit_events", lambda _tenant_id, _page, _limit: {"items": [{"id": "audit-1"}], "total": 1})
+    monkeypatch.setattr(api, "list_tenant_workflow_runs", lambda _tenant_id, _page, _limit: {"items": [{"id": "run-1"}], "total": 1})
     monkeypatch.setattr(
         api,
         "tenant_metrics",
@@ -207,10 +208,12 @@ def test_tenant_pagination_and_metrics_routes(monkeypatch) -> None:
 
     candidates = client.get("/v1/tenants/tenant-001/candidates?page=2&limit=10")
     interactions = client.get("/v1/tenants/tenant-001/interactions?page=1&limit=5")
+    workflows = client.get("/v1/tenants/tenant-001/workflow-runs?page=1&limit=5")
     audit = client.get("/v1/tenants/tenant-001/audit-events?page=1&limit=5")
     metrics = client.get("/v1/tenants/tenant-001/metrics")
 
     assert candidates.json()["data"]["pagination"] == {"page": 2, "limit": 10, "total": 11, "pages": 2}
     assert interactions.json()["data"]["items"] == [{"id": "int-1"}]
+    assert workflows.json()["data"]["items"] == [{"id": "run-1"}]
     assert audit.json()["data"]["items"] == [{"id": "audit-1"}]
     assert metrics.json()["data"]["channel_backlog"] == [{"channel": "email", "pending": 1}]

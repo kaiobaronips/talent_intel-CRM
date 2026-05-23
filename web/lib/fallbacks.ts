@@ -1,4 +1,4 @@
-import type { ApiKey, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMembership, TenantMetrics } from './types';
+import type { ApiKey, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMembership, TenantMetrics, WorkflowRun } from './types';
 
 export const defaultTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID ?? 'api-controlled-003';
 
@@ -104,3 +104,18 @@ export const fallbackAuditEvents: Paginated<AuditEvent> = {
 export const fallbackMemberships: TenantMembership[] = [
   { id: 'member-sample-001', tenant_id: defaultTenantId, user_id: 'owner-demo', email: 'owner@example.com', role: 'owner' },
 ];
+
+export const fallbackWorkflowRuns: Paginated<WorkflowRun> = {
+  items: [
+    {
+      id: 'workflow-sample-001',
+      tenant_id: defaultTenantId,
+      candidate_id: 'candidate-sample-001',
+      workflow_name: 'CandidateLifecycleWorkflow',
+      workflow_id: 'candidate-lifecycle::demo',
+      run_id: 'run-sample-001',
+      status: 'Completed',
+    },
+  ],
+  pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+};

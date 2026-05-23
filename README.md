@@ -207,3 +207,7 @@ A API possui CRUD inicial para memberships de tenant:
 - `DELETE /v1/tenants/{tenant_id}/memberships/{membership_id}`
 
 A UI possui `/members` para gerenciar membros. Esses registros serao a base do login humano SaaS quando o provedor de auth for ativado.
+
+## Workflow Runs
+
+A API expoe `GET /v1/tenants/{tenant_id}/workflow-runs` e a UI possui `/workflows` para observar execucoes Temporal por tenant.

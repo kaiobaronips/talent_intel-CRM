@@ -114,3 +114,15 @@ export type TenantMembership = {
   created_at?: string;
   updated_at?: string;
 };
+
+export type WorkflowRun = {
+  id: string;
+  tenant_id?: string;
+  candidate_id?: string | null;
+  workflow_name: string;
+  workflow_id: string;
+  run_id: string;
+  status: string;
+  started_at?: string;
+  finished_at?: string | null;
+};
