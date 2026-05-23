@@ -193,3 +193,7 @@ make prod-readiness
 ```
 
 O comando valida variaveis obrigatorias sem imprimir valores sensiveis e bloqueia producao com `TICRM_ALLOW_INSECURE_DEV_AUTH=true`.
+
+## Auth Roadmap
+
+A estrategia de login SaaS esta documentada em `docs/auth-strategy.md`. O projeto mantem API keys para automacoes server-to-server e prepara `tenant_memberships` para login humano por tenant.
