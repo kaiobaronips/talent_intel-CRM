@@ -29,3 +29,15 @@ Acesse `http://localhost:3000`.
 ## Regra de seguranca
 
 O app chama a API a partir de Server Components. A chave `TICRM_API_KEY` fica apenas no processo Next.js e nao e enviada ao browser.
+
+## Acoes operacionais
+
+A UI ja possui Server Actions para:
+
+- criar tenant e iniciar onboarding Temporal;
+- adicionar candidato e iniciar `CandidateLifecycleWorkflow`;
+- criar API key de tenant, exibindo a chave crua uma unica vez;
+- revogar API key;
+- rotacionar API key.
+
+As acoes usam `TICRM_API_KEY` no servidor Next.js. Se a API ou Temporal estiverem indisponiveis, o formulario retorna o erro da API sem quebrar a pagina.

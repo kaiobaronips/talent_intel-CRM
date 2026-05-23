@@ -1,3 +1,4 @@
+import { CandidateCreateForm } from '@/components/ActionForms';
 import { DataTable } from '@/components/DataTable';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
@@ -25,6 +26,8 @@ export default async function CandidatesPage() {
         <MetricCard label="Com e-mail" value={withEmail} accent="green" />
         <MetricCard label="Com LinkedIn" value={withLinkedIn} accent="blue" />
       </section>
+
+      <CandidateCreateForm tenantId={tenantId} />
 
       <DataTable<Candidate>
         eyebrow="Talentos"

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CandidateCreateForm, TenantCreateForm } from '@/components/ActionForms';
 import { DataTable } from '@/components/DataTable';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
@@ -35,6 +36,11 @@ export default async function DashboardPage() {
         <MetricCard label="Candidatos" value={candidatesResult.data.pagination.total} detail="base atual" accent="green" />
         <MetricCard label="Backlog" value={backlogTotal} detail="email + LinkedIn" accent="amber" />
         <MetricCard label="Workflow runs" value={workflowTotal} detail={`${metrics.workflow_runs.running ?? 0} rodando`} accent="blue" />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <TenantCreateForm />
+        <CandidateCreateForm tenantId={tenantId} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">

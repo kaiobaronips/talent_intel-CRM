@@ -7,19 +7,36 @@ const apiKey = process.env.TICRM_API_KEY;
 type ApiEnvelope<T> = {
   success?: boolean;
   data?: T;
+  detail?: string;
   error?: unknown;
 };
 
-async function apiGet<T>(path: string, fallback: T): Promise<ApiResult<T>> {
-  const headers: HeadersInit = { Accept: 'application/json' };
+type ApiMutationResult<T> = {
+  ok: boolean;
+  status: number;
+  data?: T;
+  message: string;
+};
+
+type ApiKeysPayload = {
+  tenant_id: string;
+  items: ApiKey[];
+};
+
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
 
   if (apiKey) {
     headers['X-API-Key'] = apiKey;
   }
 
+  return headers;
+}
+
+async function apiGet<T>(path: string, fallback: T): Promise<ApiResult<T>> {
   try {
     const response = await fetch(`${apiBaseUrl}${path}`, {
-      headers,
+      headers: authHeaders(),
       cache: 'no-store',
     });
 
@@ -37,6 +54,42 @@ async function apiGet<T>(path: string, fallback: T): Promise<ApiResult<T>> {
     return { data: data as T, offline: false };
   } catch {
     return { data: fallback, offline: true };
+  }
+}
+
+export async function apiMutation<T>(path: string, method: 'POST' | 'DELETE', body?: unknown): Promise<ApiMutationResult<T>> {
+  try {
+    const headers = authHeaders();
+    headers['Content-Type'] = 'application/json';
+
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: 'no-store',
+    });
+    const payload = (await response.json().catch(() => ({}))) as ApiEnvelope<T>;
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        message: payload.detail ?? `API retornou HTTP ${response.status}`,
+      };
+    }
+
+    return {
+      ok: true,
+      status: response.status,
+      data: payload.data,
+      message: 'Operacao concluida.',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      message: error instanceof Error ? error.message : 'Falha desconhecida ao chamar API.',
+    };
   }
 }
 
@@ -65,5 +118,6 @@ export async function getInteractions(tenantId = defaultTenantId, limit = 20): P
 }
 
 export async function getApiKeys(tenantId = defaultTenantId): Promise<ApiResult<ApiKey[]>> {
-  return apiGet<ApiKey[]>(`/v1/tenants/${tenantId}/api-keys`, fallbackApiKeys);
+  const result = await apiGet<ApiKeysPayload>(`/v1/tenants/${tenantId}/api-keys`, { tenant_id: tenantId, items: fallbackApiKeys });
+  return { data: result.data.items, offline: result.offline };
 }

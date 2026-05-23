@@ -1,3 +1,4 @@
+import { ApiKeyCreateForm, ApiKeyLifecycleForm, CandidateCreateForm } from '@/components/ActionForms';
 import { DataTable } from '@/components/DataTable';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
@@ -33,6 +34,13 @@ export default async function TenantPage({ params }: TenantPageProps) {
         <MetricCard label="Backlog" value={backlogTotal} detail="pendencias por canal" accent="amber" />
         <MetricCard label="API keys" value={keysResult.data.length} detail="credenciais tenant" accent="ink" />
       </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <CandidateCreateForm tenantId={tenantId} />
+        <ApiKeyCreateForm tenantId={tenantId} />
+      </section>
+
+      <ApiKeyLifecycleForm tenantId={tenantId} />
 
       <DataTable<ApiKey>
         eyebrow="Seguranca"
