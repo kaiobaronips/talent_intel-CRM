@@ -93,3 +93,14 @@ export type ApiResult<T> = {
   data: T;
   offline: boolean;
 };
+
+export type AuditEvent = {
+  id: string;
+  tenant_id?: string;
+  candidate_id?: string | null;
+  event_type: string;
+  actor_type?: string;
+  actor_id?: string;
+  payload_json?: Record<string, unknown>;
+  created_at?: string;
+};

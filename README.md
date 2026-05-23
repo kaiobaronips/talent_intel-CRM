@@ -179,3 +179,7 @@ A API expoe `GET /v1/me` para a UI identificar se a chave atual e `admin` ou `te
 
 - Chave admin: a UI usa `NEXT_PUBLIC_DEFAULT_TENANT_ID` como tenant ativo ate existir login/seletor multi-tenant completo.
 - Chave de tenant: a UI resolve automaticamente o tenant pelo escopo da chave e evita depender de tenant fixo.
+
+## Operational Audit
+
+A API expoe `GET /v1/tenants/{tenant_id}/audit-events` e a UI possui `/audit` para visualizar eventos recentes por tenant. Use essa tela para investigar execucoes de workflow, eventos de lifecycle e acoes automaticas antes de operar em producao.

@@ -1,4 +1,4 @@
-import type { ApiKey, Candidate, Interaction, Paginated, Tenant, TenantMetrics } from './types';
+import type { ApiKey, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMetrics } from './types';
 
 export const defaultTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID ?? 'api-controlled-003';
 
@@ -86,3 +86,17 @@ export const fallbackMetrics: TenantMetrics = {
 export const fallbackApiKeys: ApiKey[] = [
   { id: 'sample-key-readonly', name: 'Demo read-only key', status: 'active' },
 ];
+
+export const fallbackAuditEvents: Paginated<AuditEvent> = {
+  items: [
+    {
+      id: 'audit-sample-001',
+      tenant_id: defaultTenantId,
+      candidate_id: 'candidate-sample-001',
+      event_type: 'candidate.lifecycle_completed',
+      actor_type: 'system',
+      actor_id: 'temporal-worker',
+    },
+  ],
+  pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+};

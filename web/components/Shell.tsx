@@ -8,6 +8,7 @@ const navItems = [
   { href: `/tenants/${getDefaultTenantId()}`, label: 'Tenant' },
   { href: '/candidates', label: 'Candidatos' },
   { href: '/interactions', label: 'Interacoes' },
+  { href: '/audit', label: 'Auditoria' },
   { href: '/system', label: 'System' },
 ];
 
