@@ -46,3 +46,16 @@ services:
       SUPABASE_DB_URL: ${SUPABASE_DB_URL}
     profiles:
       - ops
+
+
+  web:
+    image: ${TICRM_WEB_IMAGE}
+    environment:
+      NEXT_PUBLIC_TICRM_API_URL: ${NEXT_PUBLIC_TICRM_API_URL}
+      NEXT_PUBLIC_DEFAULT_TENANT_ID: ${NEXT_PUBLIC_DEFAULT_TENANT_ID}
+      TICRM_API_KEY: ${TICRM_WEB_API_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped

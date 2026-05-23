@@ -33,3 +33,16 @@ services:
     env_file:
       - ../.env
     restart: unless-stopped
+
+
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    env_file:
+      - ../web/.env.local.example
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped

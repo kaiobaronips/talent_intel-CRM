@@ -103,3 +103,30 @@ Inject production variables from the platform secrets manager. Use `deploy/produ
 - Request logs include `X-Request-ID`, path, status and duration.
 - Worker activity logs emit structured metric events with `outcome`, duration and relevant tenant/channel/workflow fields.
 - `GET /v1/tenants/{tenant_id}/metrics` returns workflow run outcome counts, interaction counts and pending backlog grouped by channel from Postgres.
+
+## Web Container
+
+A UI Next.js possui imagem separada em `web/Dockerfile`.
+
+Build local:
+
+```bash
+docker build -t talent-intel-crm-web:local ./web
+```
+
+Compose local com API, worker e UI:
+
+```bash
+docker compose -f deploy/compose.yml up --build api worker web
+```
+
+Compose producao espera duas imagens:
+
+- `TICRM_IMAGE`: API/worker Python
+- `TICRM_WEB_IMAGE`: UI Next.js
+
+A UI precisa das variaveis:
+
+- `NEXT_PUBLIC_TICRM_API_URL`
+- `NEXT_PUBLIC_DEFAULT_TENANT_ID`
+- `TICRM_WEB_API_KEY`, repassada como `TICRM_API_KEY` apenas no servidor Next.js
