@@ -5,3 +5,11 @@ __pycache__/
 *.egg-info/
 .DS_Store
 RAW/.DS_Store
+
+# Web UI
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+.env.local

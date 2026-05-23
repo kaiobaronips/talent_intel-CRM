@@ -147,3 +147,22 @@ Quando as variaveis `NOTION_MIRROR_*` estiverem preenchidas, as activities de pe
 - `Interactions`
 - `Workflow Runs`
 - `Audit Events`
+
+## Web SaaS UI
+
+A UI comercial fica em `web/` e roda como app Next.js separado da API/worker Python.
+
+```bash
+cd web
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Configurar em `web/.env.local`:
+
+- `NEXT_PUBLIC_TICRM_API_URL=http://localhost:8000`
+- `TICRM_API_KEY=<admin-ou-tenant-api-key>`
+- `NEXT_PUBLIC_DEFAULT_TENANT_ID=api-controlled-003`
+
+A chave da API e usada apenas server-side pelo Next.js.

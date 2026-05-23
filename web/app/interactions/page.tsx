@@ -1,0 +1,41 @@
+import { DataTable } from '@/components/DataTable';
+import { MetricCard } from '@/components/MetricCard';
+import { Shell } from '@/components/Shell';
+import { StatusBadge } from '@/components/StatusBadge';
+import { getDefaultTenantId, getInteractions, getTenantMetrics } from '@/lib/api';
+import type { Interaction } from '@/lib/types';
+
+export const dynamic = 'force-dynamic';
+
+export default async function InteractionsPage() {
+  const tenantId = getDefaultTenantId();
+  const [interactionsResult, metricsResult] = await Promise.all([getInteractions(tenantId, 50), getTenantMetrics(tenantId)]);
+  const interactions = interactionsResult.data.items;
+  const linkedin = interactions.filter((interaction) => interaction.channel === 'linkedin').length;
+  const email = interactions.filter((interaction) => interaction.channel === 'email').length;
+  const backlogTotal = metricsResult.data.channel_backlog.reduce((sum, item) => sum + item.pending, 0);
+
+  return (
+    <Shell offline={interactionsResult.offline || metricsResult.offline} title="Interacoes por canal" subtitle="Fila separada por LinkedIn e E-mail. Nao existe bloqueio operacional por score ou canal alternativo.">
+      <section className="stagger grid gap-4 md:grid-cols-3">
+        <MetricCard label="Backlog total" value={backlogTotal} accent="amber" />
+        <MetricCard label="LinkedIn" value={linkedin} detail="interacoes" accent="blue" />
+        <MetricCard label="E-mail" value={email} detail="interacoes" accent="green" />
+      </section>
+
+      <DataTable<Interaction>
+        eyebrow="Cadencia"
+        title="Fila operacional"
+        rows={interactions}
+        columns={[
+          { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_name ?? row.candidate_id },
+          { key: 'channel', label: 'Canal', render: (row) => <StatusBadge value={row.channel} /> },
+          { key: 'interaction', label: 'Interacao', render: (row) => <StatusBadge value={row.interaction_status} /> },
+          { key: 'next', label: 'Proxima acao', render: (row) => <StatusBadge value={row.next_action} /> },
+          { key: 'sent', label: 'Mensagem', render: (row) => row.message_sent ?? '-' },
+          { key: 'response', label: 'Resposta', render: (row) => row.response_received ?? '-' },
+        ]}
+      />
+    </Shell>
+  );
+}
