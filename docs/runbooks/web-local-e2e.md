@@ -59,3 +59,26 @@ Acessar:
 - Criar candidato pela UI retorna sucesso.
 - Candidato aparece na lista paginada.
 - Build de producao passa com `npm run build`.
+
+## 4. Automacao local
+
+Preparar `web/.env.local` sem imprimir segredo:
+
+```bash
+export TICRM_ADMIN_API_KEY=<admin-key>
+export TICRM_API_URL=http://127.0.0.1:8000
+export TICRM_SMOKE_TENANT_ID=api-controlled-003
+make prepare-web-env
+```
+
+Rodar smoke da API:
+
+```bash
+make smoke-api
+```
+
+Rodar validacao completa de codigo:
+
+```bash
+make validate
+```
