@@ -33,7 +33,7 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
-async function apiGet<T>(path: string, fallback: T): Promise<ApiResult<T>> {
+export async function apiGetRaw<T>(path: string, fallback: T): Promise<ApiResult<T>> {
   try {
     const response = await fetch(`${apiBaseUrl}${path}`, {
       headers: authHeaders(),
@@ -102,22 +102,22 @@ export function getDefaultTenantId(): string {
 }
 
 export async function getTenant(tenantId = defaultTenantId): Promise<ApiResult<Tenant>> {
-  return apiGet<Tenant>(`/v1/tenants/${tenantId}`, fallbackTenant);
+  return apiGetRaw<Tenant>(`/v1/tenants/${tenantId}`, fallbackTenant);
 }
 
 export async function getTenantMetrics(tenantId = defaultTenantId): Promise<ApiResult<TenantMetrics>> {
-  return apiGet<TenantMetrics>(`/v1/tenants/${tenantId}/metrics`, fallbackMetrics);
+  return apiGetRaw<TenantMetrics>(`/v1/tenants/${tenantId}/metrics`, fallbackMetrics);
 }
 
 export async function getCandidates(tenantId = defaultTenantId, limit = 20): Promise<ApiResult<Paginated<Candidate>>> {
-  return apiGet<Paginated<Candidate>>(`/v1/tenants/${tenantId}/candidates?page=1&limit=${limit}`, fallbackCandidates);
+  return apiGetRaw<Paginated<Candidate>>(`/v1/tenants/${tenantId}/candidates?page=1&limit=${limit}`, fallbackCandidates);
 }
 
 export async function getInteractions(tenantId = defaultTenantId, limit = 20): Promise<ApiResult<Paginated<Interaction>>> {
-  return apiGet<Paginated<Interaction>>(`/v1/tenants/${tenantId}/interactions?page=1&limit=${limit}`, fallbackInteractions);
+  return apiGetRaw<Paginated<Interaction>>(`/v1/tenants/${tenantId}/interactions?page=1&limit=${limit}`, fallbackInteractions);
 }
 
 export async function getApiKeys(tenantId = defaultTenantId): Promise<ApiResult<ApiKey[]>> {
-  const result = await apiGet<ApiKeysPayload>(`/v1/tenants/${tenantId}/api-keys`, { tenant_id: tenantId, items: fallbackApiKeys });
+  const result = await apiGetRaw<ApiKeysPayload>(`/v1/tenants/${tenantId}/api-keys`, { tenant_id: tenantId, items: fallbackApiKeys });
   return { data: result.data.items, offline: result.offline };
 }

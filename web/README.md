@@ -41,3 +41,12 @@ A UI ja possui Server Actions para:
 - rotacionar API key.
 
 As acoes usam `TICRM_API_KEY` no servidor Next.js. Se a API ou Temporal estiverem indisponiveis, o formulario retorna o erro da API sem quebrar a pagina.
+
+## System readiness
+
+A rota `/system` valida conexao com:
+
+- `/health`: API e configuracao Temporal;
+- `/ready`: Postgres/Supabase.
+
+Use o runbook em `docs/runbooks/web-local-e2e.md` para teste ponta a ponta local.
