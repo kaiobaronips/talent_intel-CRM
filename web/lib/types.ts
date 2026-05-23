@@ -104,3 +104,13 @@ export type AuditEvent = {
   payload_json?: Record<string, unknown>;
   created_at?: string;
 };
+
+export type TenantMembership = {
+  id: string;
+  tenant_id?: string;
+  user_id: string;
+  email?: string;
+  role: 'owner' | 'admin' | 'recruiter' | 'viewer' | string;
+  created_at?: string;
+  updated_at?: string;
+};

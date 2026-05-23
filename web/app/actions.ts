@@ -140,3 +140,48 @@ export async function rotateApiKeyAction(_previousState: ActionState, formData: 
     secret: result.data?.api_key,
   };
 }
+
+
+export async function upsertMembershipAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const userId = text(formData, 'user_id');
+  const email = text(formData, 'email');
+  const role = text(formData, 'role') || 'viewer';
+
+  if (!userId) {
+    return { ...initialError, message: 'User ID obrigatorio.' };
+  }
+
+  const result = await apiMutation<{ membership: { id: string; role: string } }>(`/v1/tenants/${tenantId}/memberships`, 'POST', {
+    user_id: userId,
+    email,
+    role,
+  });
+
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidatePath('/members');
+  revalidatePath(`/tenants/${tenantId}`);
+  return { ok: true, message: `Membro ${userId} salvo como ${result.data?.membership?.role ?? role}.` };
+}
+
+export async function deleteMembershipAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const membershipId = text(formData, 'membership_id');
+
+  if (!membershipId) {
+    return { ...initialError, message: 'Membership ID obrigatorio.' };
+  }
+
+  const result = await apiMutation<{ membership: { id: string } }>(`/v1/tenants/${tenantId}/memberships/${membershipId}`, 'DELETE');
+
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidatePath('/members');
+  revalidatePath(`/tenants/${tenantId}`);
+  return { ok: true, message: `Membro ${membershipId} removido.` };
+}

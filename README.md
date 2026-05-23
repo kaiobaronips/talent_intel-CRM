@@ -197,3 +197,13 @@ O comando valida variaveis obrigatorias sem imprimir valores sensiveis e bloquei
 ## Auth Roadmap
 
 A estrategia de login SaaS esta documentada em `docs/auth-strategy.md`. O projeto mantem API keys para automacoes server-to-server e prepara `tenant_memberships` para login humano por tenant.
+
+## Tenant Memberships
+
+A API possui CRUD inicial para memberships de tenant:
+
+- `GET /v1/tenants/{tenant_id}/memberships`
+- `POST /v1/tenants/{tenant_id}/memberships`
+- `DELETE /v1/tenants/{tenant_id}/memberships/{membership_id}`
+
+A UI possui `/members` para gerenciar membros. Esses registros serao a base do login humano SaaS quando o provedor de auth for ativado.

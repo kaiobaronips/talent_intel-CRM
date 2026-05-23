@@ -95,6 +95,53 @@ def get_tenant(tenant_id: str) -> dict[str, Any]:
             return dict(cur.fetchone() or {})
 
 
+def upsert_tenant_membership(payload: dict[str, Any]) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                insert into tenant_memberships (tenant_id, user_id, email, role)
+                values (%(tenant_id)s, %(user_id)s, %(email)s, %(role)s)
+                on conflict (tenant_id, user_id) do update set
+                    email = excluded.email,
+                    role = excluded.role,
+                    updated_at = now()
+                returning id, tenant_id, user_id, email, role, created_at, updated_at
+                """,
+                payload,
+            )
+            return dict(cur.fetchone() or {})
+
+
+def list_tenant_memberships(tenant_id: str) -> list[dict[str, Any]]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select id, tenant_id, user_id, email, role, created_at, updated_at
+                from tenant_memberships
+                where tenant_id = %s
+                order by created_at desc, id desc
+                """,
+                (tenant_id,),
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+
+def delete_tenant_membership(tenant_id: str, membership_id: str) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                delete from tenant_memberships
+                where tenant_id = %s and id::text = %s
+                returning id, tenant_id, user_id, email, role, created_at, updated_at
+                """,
+                (tenant_id, membership_id),
+            )
+            return dict(cur.fetchone() or {})
+
+
 def insert_tenant_api_key(payload: dict[str, Any]) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:

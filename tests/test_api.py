@@ -143,6 +143,34 @@ def test_create_tenant_key_returns_raw_key_once(monkeypatch) -> None:
     assert "key_hash" not in response.json()["data"]["key"]
 
 
+def test_tenant_membership_routes(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "list_tenant_memberships", lambda _tenant_id: [{"id": "member-001", "role": "admin"}])
+    monkeypatch.setattr(api, "upsert_tenant_membership", lambda payload: {"id": "member-001", **payload})
+    monkeypatch.setattr(api, "delete_tenant_membership", lambda _tenant_id, membership_id: {"id": membership_id, "role": "viewer"})
+    client = TestClient(api.app)
+
+    listed = client.get("/v1/tenants/tenant-001/memberships")
+    created = client.post(
+        "/v1/tenants/tenant-001/memberships",
+        json={"user_id": "user-001", "email": "user@example.com", "role": "recruiter"},
+    )
+    deleted = client.delete("/v1/tenants/tenant-001/memberships/member-001")
+
+    assert listed.json()["data"]["items"] == [{"id": "member-001", "role": "admin"}]
+    assert created.status_code == 201
+    assert created.json()["data"]["membership"]["role"] == "recruiter"
+    assert deleted.json()["data"]["membership"]["id"] == "member-001"
+
+
+def test_tenant_membership_delete_not_found(monkeypatch) -> None:
+    monkeypatch.setattr(api, "delete_tenant_membership", lambda _tenant_id, _membership_id: {})
+
+    response = TestClient(api.app).delete("/v1/tenants/tenant-001/memberships/missing")
+
+    assert response.status_code == 404
+
+
 def test_tenant_key_lifecycle_routes(monkeypatch) -> None:
     monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
     monkeypatch.setattr(api, "list_tenant_api_keys", lambda _tenant_id: [{"id": "key-001", "is_active": True}])

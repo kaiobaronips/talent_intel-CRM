@@ -1,5 +1,5 @@
-import { defaultTenantId, fallbackApiKeys, fallbackAuditEvents, fallbackCandidates, fallbackInteractions, fallbackMetrics, fallbackTenant } from './fallbacks';
-import type { ApiKey, ApiResult, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMetrics } from './types';
+import { defaultTenantId, fallbackApiKeys, fallbackAuditEvents, fallbackCandidates, fallbackInteractions, fallbackMemberships, fallbackMetrics, fallbackTenant } from './fallbacks';
+import type { ApiKey, ApiResult, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMembership, TenantMetrics } from './types';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_TICRM_API_URL ?? 'http://localhost:8000';
 const apiKey = process.env.TICRM_API_KEY;
@@ -21,6 +21,11 @@ type ApiMutationResult<T> = {
 type ApiKeysPayload = {
   tenant_id: string;
   items: ApiKey[];
+};
+
+type MembershipsPayload = {
+  tenant_id: string;
+  items: TenantMembership[];
 };
 
 function authHeaders(): Record<string, string> {
@@ -119,6 +124,11 @@ export async function getCandidates(tenantId = defaultTenantId, limit = 20): Pro
 
 export async function getInteractions(tenantId = defaultTenantId, limit = 20): Promise<ApiResult<Paginated<Interaction>>> {
   return apiGetRaw<Paginated<Interaction>>(`/v1/tenants/${tenantId}/interactions?page=1&limit=${limit}`, fallbackInteractions);
+}
+
+export async function getMemberships(tenantId = defaultTenantId): Promise<ApiResult<TenantMembership[]>> {
+  const result = await apiGetRaw<MembershipsPayload>(`/v1/tenants/${tenantId}/memberships`, { tenant_id: tenantId, items: fallbackMemberships });
+  return { data: result.data.items, offline: result.offline };
 }
 
 export async function getApiKeys(tenantId = defaultTenantId): Promise<ApiResult<ApiKey[]>> {

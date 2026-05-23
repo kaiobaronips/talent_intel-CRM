@@ -14,6 +14,7 @@ from talent_intel_crm.client import connect_temporal
 from talent_intel_crm.config import TemporalConfig
 from talent_intel_crm.db import (
     database_ready,
+    delete_tenant_membership,
     get_candidate,
     get_tenant,
     insert_tenant_api_key,
@@ -22,9 +23,11 @@ from talent_intel_crm.db import (
     list_tenant_audit_events,
     list_tenant_candidates,
     list_tenant_interactions,
+    list_tenant_memberships,
     revoke_tenant_api_key,
     tenant_exists,
     tenant_metrics,
+    upsert_tenant_membership,
 )
 from talent_intel_crm.domain import CandidateChannel, CandidateStage, TenantTier
 from talent_intel_crm.workflows import CandidateLifecycleWorkflow, TenantOnboardingWorkflow
@@ -74,6 +77,12 @@ class CandidateCreateRequest(BaseModel):
     linkedin_url: str = Field(default="", max_length=1000)
     channels: List[CandidateChannel] = Field(default_factory=list)
     source_page_id: Optional[str] = Field(default=None, max_length=240)
+
+
+class TenantMembershipUpsertRequest(BaseModel):
+    user_id: str = Field(min_length=2, max_length=240)
+    email: str = Field(default="", max_length=320)
+    role: str = Field(default="viewer", pattern="^(owner|admin|recruiter|viewer)$")
 
 
 class TenantAPIKeyCreateRequest(BaseModel):
@@ -170,6 +179,47 @@ async def read_tenant(tenant_id: str, principal: APIPrincipal = Depends(require_
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     authorize_tenant(principal, tenant["id"])
     return _success(tenant)
+
+
+@app.get("/v1/tenants/{tenant_id}/memberships")
+async def read_tenant_memberships(tenant_id: str, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
+    require_admin(principal)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    return _success({"tenant_id": tenant_id, "items": list_tenant_memberships(tenant_id)})
+
+
+@app.post("/v1/tenants/{tenant_id}/memberships", status_code=status.HTTP_201_CREATED)
+async def upsert_membership(
+    tenant_id: str,
+    payload: TenantMembershipUpsertRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_admin(principal)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    membership = upsert_tenant_membership(
+        {
+            "tenant_id": tenant_id,
+            "user_id": payload.user_id,
+            "email": payload.email,
+            "role": payload.role,
+        }
+    )
+    return _success({"tenant_id": tenant_id, "membership": membership})
+
+
+@app.delete("/v1/tenants/{tenant_id}/memberships/{membership_id}")
+async def remove_tenant_membership(
+    tenant_id: str,
+    membership_id: str,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_admin(principal)
+    membership = delete_tenant_membership(tenant_id, membership_id)
+    if not membership:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant membership not found")
+    return _success({"tenant_id": tenant_id, "membership": membership})
 
 
 @app.post("/v1/tenants/{tenant_id}/api-keys", status_code=status.HTTP_201_CREATED)
