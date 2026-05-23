@@ -28,6 +28,13 @@ def admin_principal_override():
     api.app.dependency_overrides.clear()
 
 
+def test_read_current_principal() -> None:
+    response = TestClient(api.app).get("/v1/me")
+
+    assert response.status_code == 200
+    assert response.json()["data"] == {"role": "admin", "tenant_id": "", "api_key_id": "", "is_admin": True}
+
+
 def test_health_is_open() -> None:
     response = TestClient(api.app).get("/health")
 

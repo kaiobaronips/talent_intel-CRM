@@ -172,3 +172,10 @@ A chave da API e usada apenas server-side pelo Next.js.
 - `make validate`: roda testes Python, Ruff, typecheck/lint/build da UI.
 - `make prepare-web-env`: cria `web/.env.local` a partir de variaveis de ambiente sem imprimir segredo.
 - `make smoke-api`: valida `/health`, `/ready`, tenant, metricas, candidatos e interacoes contra a API local.
+
+## Access Context
+
+A API expoe `GET /v1/me` para a UI identificar se a chave atual e `admin` ou `tenant-scoped`.
+
+- Chave admin: a UI usa `NEXT_PUBLIC_DEFAULT_TENANT_ID` como tenant ativo ate existir login/seletor multi-tenant completo.
+- Chave de tenant: a UI resolve automaticamente o tenant pelo escopo da chave e evita depender de tenant fixo.

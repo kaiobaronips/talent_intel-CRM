@@ -1,14 +1,16 @@
+import { ContextPanel } from '@/components/ContextPanel';
 import { DataTable } from '@/components/DataTable';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
-import { getDefaultTenantId, getInteractions, getTenantMetrics } from '@/lib/api';
+import { getInteractions, getTenantMetrics } from '@/lib/api';
+import { resolveActiveTenantId } from '@/lib/session';
 import type { Interaction } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function InteractionsPage() {
-  const tenantId = getDefaultTenantId();
+  const { tenantId, principal } = await resolveActiveTenantId();
   const [interactionsResult, metricsResult] = await Promise.all([getInteractions(tenantId, 50), getTenantMetrics(tenantId)]);
   const interactions = interactionsResult.data.items;
   const linkedin = interactions.filter((interaction) => interaction.channel === 'linkedin').length;
@@ -22,6 +24,8 @@ export default async function InteractionsPage() {
         <MetricCard label="LinkedIn" value={linkedin} detail="interacoes" accent="blue" />
         <MetricCard label="E-mail" value={email} detail="interacoes" accent="green" />
       </section>
+
+      <ContextPanel tenantId={tenantId} principal={principal.data} offline={interactionsResult.offline || metricsResult.offline || principal.offline} />
 
       <DataTable<Interaction>
         eyebrow="Cadencia"

@@ -1,15 +1,17 @@
 import { CandidateCreateForm } from '@/components/ActionForms';
+import { ContextPanel } from '@/components/ContextPanel';
 import { DataTable } from '@/components/DataTable';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
-import { getCandidates, getDefaultTenantId, getTenant } from '@/lib/api';
+import { getCandidates, getTenant } from '@/lib/api';
+import { resolveActiveTenantId } from '@/lib/session';
 import type { Candidate } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function CandidatesPage() {
-  const tenantId = getDefaultTenantId();
+  const { tenantId, principal } = await resolveActiveTenantId();
   const [tenantResult, candidatesResult] = await Promise.all([getTenant(tenantId), getCandidates(tenantId, 50)]);
   const candidates = candidatesResult.data.items;
   const withEmail = candidates.filter((candidate) => Boolean(candidate.email)).length;
@@ -26,6 +28,8 @@ export default async function CandidatesPage() {
         <MetricCard label="Com e-mail" value={withEmail} accent="green" />
         <MetricCard label="Com LinkedIn" value={withLinkedIn} accent="blue" />
       </section>
+
+      <ContextPanel tenantId={tenantId} principal={principal.data} offline={tenantResult.offline || candidatesResult.offline || principal.offline} />
 
       <CandidateCreateForm tenantId={tenantId} />
 

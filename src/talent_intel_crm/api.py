@@ -127,6 +127,19 @@ async def readiness(response: Response) -> Dict[str, Any]:
     return _success({"service": "talent-intel-crm-api", "postgres": postgres_ready})
 
 
+
+
+@app.get("/v1/me")
+async def read_current_principal(principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
+    return _success(
+        {
+            "role": principal.role,
+            "tenant_id": principal.tenant_id,
+            "api_key_id": principal.api_key_id,
+            "is_admin": principal.is_admin,
+        }
+    )
+
 @app.post("/v1/tenants", status_code=status.HTTP_202_ACCEPTED)
 async def create_tenant(payload: TenantCreateRequest, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
     require_admin(principal)
