@@ -48,24 +48,24 @@ export function TenantCreateForm() {
 
   return (
     <form action={action} className="rounded-[2rem] border border-stone-200 bg-white/82 p-5 shadow-[0_24px_70px_rgba(41,37,36,0.08)] backdrop-blur">
-      <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">Admin</p>
-      <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Criar tenant</h2>
+      <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">Administração</p>
+      <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Criar empresa</h2>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <Field label="Tenant ID" name="tenant_id" placeholder="empresa-acme" required />
+        <Field label="ID da empresa" name="tenant_id" placeholder="empresa-acme" required />
         <Field label="Empresa" name="company_name" placeholder="ACME Talent" required />
         <label className="grid gap-2 text-sm font-bold text-stone-700">
           Plano
           <select name="tier" defaultValue="starter" className="rounded-2xl border border-stone-200 bg-white px-4 py-3 font-medium text-stone-950 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100">
-            <option value="starter">starter</option>
-            <option value="growth">growth</option>
-            <option value="scale">scale</option>
+            <option value="starter">inicial</option>
+            <option value="growth">crescimento</option>
+            <option value="scale">escala</option>
           </select>
         </label>
-        <Field label="Timezone" name="timezone" defaultValue="America/Sao_Paulo" />
-        <Field label="Dominio principal" name="primary_domain" placeholder="empresa.com.br" />
+        <Field label="Fuso horário" name="timezone" defaultValue="America/Sao_Paulo" />
+        <Field label="Domínio principal" name="primary_domain" placeholder="empresa.com.br" />
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <SubmitButton>Criar tenant</SubmitButton>
+        <SubmitButton>Criar empresa</SubmitButton>
         <ActionFeedback state={state} />
       </div>
     </form>
@@ -78,17 +78,17 @@ export function CandidateCreateForm({ tenantId }: { tenantId: string }) {
   return (
     <form action={action} className="rounded-[2rem] border border-stone-200 bg-white/82 p-5 shadow-[0_24px_70px_rgba(41,37,36,0.08)] backdrop-blur">
       <input type="hidden" name="tenant_id" value={tenantId} />
-      <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">Operacao</p>
+      <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">Operação</p>
       <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Adicionar candidato</h2>
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Field label="Nome" name="name" placeholder="Nome Sobrenome" required />
-        <Field label="Candidate ID opcional" name="candidate_id" placeholder="candidate-empresa-001" />
+        <Field label="ID do candidato opcional" name="candidate_id" placeholder="candidate-empresa-001" />
         <Field label="Cidade" name="city" placeholder="Sao Paulo" />
         <Field label="E-mail" name="email" type="email" placeholder="talento@email.com" />
-        <Field label="LinkedIn URL" name="linkedin_url" placeholder="https://linkedin.com/in/..." />
+        <Field label="URL do LinkedIn" name="linkedin_url" placeholder="https://linkedin.com/in/..." />
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <SubmitButton>Enviar para lifecycle</SubmitButton>
+        <SubmitButton>Enviar para o fluxo de vida</SubmitButton>
         <ActionFeedback state={state} />
       </div>
     </form>
@@ -102,9 +102,9 @@ export function ApiKeyCreateForm({ tenantId }: { tenantId: string }) {
     <form action={action} className="rounded-[2rem] border border-stone-200 bg-white/82 p-5 shadow-[0_24px_70px_rgba(41,37,36,0.08)] backdrop-blur">
       <input type="hidden" name="tenant_id" value={tenantId} />
       <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">Credenciais</p>
-      <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Criar API key</h2>
+      <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Criar chave de API</h2>
       <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-        <Field label="Label" name="label" placeholder="producao-recrutador" defaultValue="default" />
+        <Field label="Rótulo" name="label" placeholder="producao-recrutador" defaultValue="default" />
         <SubmitButton>Criar chave</SubmitButton>
       </div>
       <div className="mt-4">
@@ -123,9 +123,9 @@ export function ApiKeyLifecycleForm({ tenantId }: { tenantId: string }) {
       <form action={revokeAction} className="rounded-[2rem] border border-stone-200 bg-white/82 p-5 shadow-[0_24px_70px_rgba(41,37,36,0.08)] backdrop-blur">
         <input type="hidden" name="tenant_id" value={tenantId} />
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-rose-700">Revogar</p>
-        <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Revogar API key</h2>
+        <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Revogar chave de API</h2>
         <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-          <Field label="API key ID" name="api_key_id" placeholder="uuid-da-chave" required />
+          <Field label="ID da chave de API" name="api_key_id" placeholder="uuid-da-chave" required />
           <SubmitButton>Revogar</SubmitButton>
         </div>
         <div className="mt-4">
@@ -136,10 +136,10 @@ export function ApiKeyLifecycleForm({ tenantId }: { tenantId: string }) {
       <form action={rotateAction} className="rounded-[2rem] border border-stone-200 bg-white/82 p-5 shadow-[0_24px_70px_rgba(41,37,36,0.08)] backdrop-blur">
         <input type="hidden" name="tenant_id" value={tenantId} />
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">Rotacionar</p>
-        <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Rotacionar API key</h2>
+        <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Rotacionar chave de API</h2>
         <div className="mt-5 grid gap-4 md:grid-cols-3 md:items-end">
-          <Field label="API key ID" name="api_key_id" placeholder="uuid-da-chave" required />
-          <Field label="Novo label" name="label" placeholder="rotated" defaultValue="rotated" />
+          <Field label="ID da chave de API" name="api_key_id" placeholder="uuid-da-chave" required />
+          <Field label="Novo rótulo" name="label" placeholder="rotated" defaultValue="rotated" />
           <SubmitButton>Rotacionar</SubmitButton>
         </div>
         <div className="mt-4">

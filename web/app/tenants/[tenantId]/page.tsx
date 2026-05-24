@@ -27,12 +27,12 @@ export default async function TenantPage({ params }: TenantPageProps) {
   const backlogTotal = metricsResult.data.channel_backlog.reduce((sum, item) => sum + item.pending, 0);
 
   return (
-    <Shell offline={offline} title={tenant.company_name} subtitle={`Tenant ${tenant.id} | ${tenant.timezone ?? 'timezone nao definida'} | plano ${tenant.tier ?? 'nao definido'}`}>
+    <Shell offline={offline} title={tenant.company_name} subtitle={`Empresa ${tenant.id} | ${tenant.timezone ?? 'fuso horário não definido'} | plano ${tenant.tier ?? 'não definido'}`}>
       <section className="stagger grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Status" value={tenant.status ?? 'ativo'} accent="green" />
         <MetricCard label="Candidatos" value={candidatesResult.data.pagination.total} detail="total paginado" accent="blue" />
-        <MetricCard label="Backlog" value={backlogTotal} detail="pendencias por canal" accent="amber" />
-        <MetricCard label="API keys" value={keysResult.data.length} detail="credenciais tenant" accent="ink" />
+        <MetricCard label="Fila" value={backlogTotal} detail="pendências por canal" accent="amber" />
+        <MetricCard label="Chaves de API" value={keysResult.data.length} detail="credenciais da empresa" accent="ink" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
@@ -44,36 +44,36 @@ export default async function TenantPage({ params }: TenantPageProps) {
 
       <DataTable<ApiKey>
         eyebrow="Seguranca"
-        title="Chaves de API do tenant"
+        title="Chaves de API da empresa"
         rows={keysResult.data}
         columns={[
           { key: 'name', label: 'Nome', render: (row) => row.name },
           { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
-          { key: 'last_used', label: 'Ultimo uso', render: (row) => row.last_used_at ?? 'Nunca' },
-          { key: 'expires', label: 'Expira', render: (row) => row.expires_at ?? 'Sem expiracao' },
+          { key: 'last_used', label: 'Último uso', render: (row) => row.last_used_at ?? 'Nunca' },
+          { key: 'expires', label: 'Expira', render: (row) => row.expires_at ?? 'Sem expiração' },
         ]}
       />
 
       <section className="grid gap-6 xl:grid-cols-2">
         <DataTable<Candidate>
-          eyebrow="Tenant"
+          eyebrow="Empresa"
           title="Candidatos"
           rows={candidatesResult.data.items}
           columns={[
             { key: 'name', label: 'Nome', render: (row) => row.name },
             { key: 'classification', label: 'Classe', render: (row) => <StatusBadge value={row.classification} /> },
-            { key: 'stage', label: 'Stage', render: (row) => <StatusBadge value={row.stage} /> },
+            { key: 'stage', label: 'Etapa', render: (row) => <StatusBadge value={row.stage} /> },
           ]}
         />
 
         <DataTable<Interaction>
-          eyebrow="Tenant"
-          title="Interacoes"
+          eyebrow="Empresa"
+          title="Interações"
           rows={interactionsResult.data.items}
           columns={[
             { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_name ?? row.candidate_id },
             { key: 'channel', label: 'Canal', render: (row) => <StatusBadge value={row.channel} /> },
-            { key: 'next', label: 'Proxima', render: (row) => row.next_action ?? '-' },
+            { key: 'next', label: 'Próxima', render: (row) => row.next_action ?? '-' },
           ]}
         />
       </section>

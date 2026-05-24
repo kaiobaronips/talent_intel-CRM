@@ -17,25 +17,25 @@ export default async function WorkflowsPage() {
   const running = runs.filter((run) => run.status === 'Running').length;
 
   return (
-    <Shell offline={workflowResult.offline || principal.offline} title="Workflow runs" subtitle="Observabilidade dos workflows Temporal por tenant.">
+    <Shell offline={workflowResult.offline || principal.offline} title="Execuções de fluxo" subtitle="Observabilidade dos fluxos Temporal por empresa.">
       <section className="stagger grid gap-4 md:grid-cols-3">
-        <MetricCard label="Runs" value={workflowResult.data.pagination.total} accent="ink" />
-        <MetricCard label="Completed" value={completed} accent="green" />
-        <MetricCard label="Running" value={running} accent="blue" />
+        <MetricCard label="Execuções" value={workflowResult.data.pagination.total} accent="ink" />
+        <MetricCard label="Concluídas" value={completed} accent="green" />
+        <MetricCard label="Em execução" value={running} accent="blue" />
       </section>
 
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={workflowResult.offline || principal.offline} />
 
       <DataTable<WorkflowRun>
         eyebrow="Temporal"
-        title="Execucoes recentes"
+        title="Execuções recentes"
         rows={runs}
         columns={[
-          { key: 'workflow', label: 'Workflow', render: (row) => row.workflow_name },
+          { key: 'workflow', label: 'Fluxo', render: (row) => row.workflow_name },
           { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
           { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_id ?? '-' },
-          { key: 'workflow_id', label: 'Workflow ID', render: (row) => row.workflow_id },
-          { key: 'started', label: 'Inicio', render: (row) => row.started_at ?? '-' },
+          { key: 'workflow_id', label: 'ID do fluxo', render: (row) => row.workflow_id },
+          { key: 'started', label: 'Início', render: (row) => row.started_at ?? '-' },
         ]}
       />
     </Shell>

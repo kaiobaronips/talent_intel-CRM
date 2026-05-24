@@ -9,7 +9,7 @@ export type ActionState = {
   secret?: string;
 };
 
-const initialError: ActionState = { ok: false, message: 'Formulario invalido.' };
+const initialError: ActionState = { ok: false, message: 'Formulário inválido.' };
 
 function text(formData: FormData, key: string): string {
   return String(formData.get(key) ?? '').trim();
@@ -30,7 +30,7 @@ export async function createTenantAction(_previousState: ActionState, formData: 
   const timezone = text(formData, 'timezone') || 'America/Sao_Paulo';
 
   if (!tenantId || !companyName) {
-    return { ...initialError, message: 'Tenant ID e empresa sao obrigatorios.' };
+    return { ...initialError, message: 'ID da empresa e nome da empresa são obrigatórios.' };
   }
 
   const result = await apiMutation<{ workflow_id: string; tenant_id: string }>('/v1/tenants', 'POST', {
@@ -46,7 +46,7 @@ export async function createTenantAction(_previousState: ActionState, formData: 
   }
 
   revalidateTenantViews(tenantId);
-  return { ok: true, message: `Tenant ${tenantId} enviado para onboarding.` };
+  return { ok: true, message: `Empresa ${tenantId} enviada para onboarding.` };
 }
 
 export async function createCandidateAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
@@ -58,11 +58,11 @@ export async function createCandidateAction(_previousState: ActionState, formDat
   const candidateId = text(formData, 'candidate_id');
 
   if (!name) {
-    return { ...initialError, message: 'Nome do candidato e obrigatorio.' };
+    return { ...initialError, message: 'O nome do candidato é obrigatório.' };
   }
 
   if (!email && !linkedinUrl) {
-    return { ...initialError, message: 'Informe e-mail ou LinkedIn para iniciar cadencia.' };
+    return { ...initialError, message: 'Informe e-mail ou LinkedIn para iniciar a cadência.' };
   }
 
   const result = await apiMutation<{ workflow_id: string; candidate_id: string; channels: string[] }>('/v1/candidates', 'POST', {
@@ -79,7 +79,7 @@ export async function createCandidateAction(_previousState: ActionState, formDat
   }
 
   revalidateTenantViews(tenantId);
-  return { ok: true, message: `Candidato ${result.data?.candidate_id ?? name} enviado para lifecycle.` };
+  return { ok: true, message: `Candidato ${result.data?.candidate_id ?? name} enviado para o ciclo de vida.` };
 }
 
 export async function createApiKeyAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
@@ -95,7 +95,7 @@ export async function createApiKeyAction(_previousState: ActionState, formData: 
   revalidateTenantViews(tenantId);
   return {
     ok: true,
-    message: `Chave ${result.data?.key?.id ?? label} criada. Copie agora: ela nao sera exibida novamente.`,
+    message: `Chave ${result.data?.key?.id ?? label} criada. Copie agora: ela não será exibida novamente.`,
     secret: result.data?.api_key,
   };
 }
@@ -105,7 +105,7 @@ export async function revokeApiKeyAction(_previousState: ActionState, formData: 
   const keyId = text(formData, 'api_key_id');
 
   if (!keyId) {
-    return { ...initialError, message: 'API key ID obrigatoria.' };
+    return { ...initialError, message: 'O ID da chave de API é obrigatório.' };
   }
 
   const result = await apiMutation<{ tenant_id: string }>(`/v1/tenants/${tenantId}/api-keys/${keyId}`, 'DELETE');
@@ -124,7 +124,7 @@ export async function rotateApiKeyAction(_previousState: ActionState, formData: 
   const label = text(formData, 'label') || 'rotated';
 
   if (!keyId) {
-    return { ...initialError, message: 'API key ID obrigatoria.' };
+    return { ...initialError, message: 'O ID da chave de API é obrigatório.' };
   }
 
   const result = await apiMutation<{ api_key: string; key: { id: string } }>(`/v1/tenants/${tenantId}/api-keys/${keyId}/rotate`, 'POST', { label });
@@ -149,7 +149,7 @@ export async function upsertMembershipAction(_previousState: ActionState, formDa
   const role = text(formData, 'role') || 'viewer';
 
   if (!userId) {
-    return { ...initialError, message: 'User ID obrigatorio.' };
+    return { ...initialError, message: 'O ID do usuário é obrigatório.' };
   }
 
   const result = await apiMutation<{ membership: { id: string; role: string } }>(`/v1/tenants/${tenantId}/memberships`, 'POST', {
@@ -172,7 +172,7 @@ export async function deleteMembershipAction(_previousState: ActionState, formDa
   const membershipId = text(formData, 'membership_id');
 
   if (!membershipId) {
-    return { ...initialError, message: 'Membership ID obrigatorio.' };
+    return { ...initialError, message: 'O ID da associação é obrigatório.' };
   }
 
   const result = await apiMutation<{ membership: { id: string } }>(`/v1/tenants/${tenantId}/memberships/${membershipId}`, 'DELETE');

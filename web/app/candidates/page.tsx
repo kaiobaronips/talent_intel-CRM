@@ -21,7 +21,7 @@ export default async function CandidatesPage() {
     <Shell
       offline={tenantResult.offline || candidatesResult.offline}
       title="Candidatos"
-      subtitle={`Base operacional do tenant ${tenantResult.data.company_name}. Score qualifica, mas nao bloqueia contato.`}
+      subtitle={`Base operacional da empresa ${tenantResult.data.company_name}. O score qualifica, mas não bloqueia contato.`}
     >
       <section className="stagger grid gap-4 md:grid-cols-3">
         <MetricCard label="Total" value={candidatesResult.data.pagination.total} accent="ink" />
@@ -35,16 +35,16 @@ export default async function CandidatesPage() {
 
       <DataTable<Candidate>
         eyebrow="Talentos"
-        title="Base limpa para cadencia"
+        title="Base limpa para cadência"
         rows={candidates}
         columns={[
           { key: 'name', label: 'Nome', render: (row) => row.name },
-          { key: 'location', label: 'Local', render: (row) => [row.city, row.state].filter(Boolean).join(' / ') || 'Nao informado' },
-          { key: 'email', label: 'Email', render: (row) => row.email ?? '-' },
-          { key: 'linkedin', label: 'LinkedIn', render: (row) => (row.linkedin_url ? 'Disponivel' : '-') },
+          { key: 'location', label: 'Local', render: (row) => [row.city, row.state].filter(Boolean).join(' / ') || 'Não informado' },
+          { key: 'email', label: 'E-mail', render: (row) => row.email ?? '-' },
+          { key: 'linkedin', label: 'LinkedIn', render: (row) => (row.linkedin_url ? 'Disponível' : '-') },
           { key: 'role', label: 'Cargo', render: (row) => row.current_role ?? '-' },
-          { key: 'score', label: 'Score', render: (row) => row.score_overall ?? '-' },
-          { key: 'classification', label: 'Classe', render: (row) => <StatusBadge value={row.classification} /> },
+          { key: 'score', label: 'Pontuação', render: (row) => row.score_overall ?? '-' },
+          { key: 'classification', label: 'Classificação', render: (row) => <StatusBadge value={row.classification} /> },
         ]}
       />
     </Shell>

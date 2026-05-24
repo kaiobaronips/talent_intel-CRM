@@ -13,20 +13,20 @@ export function ContextPanel({ tenantId, principal, offline = false }: ContextPa
       <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">Contexto de acesso</p>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
         <div className="rounded-2xl bg-stone-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">Tenant ativo</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">Empresa ativa</p>
           <p className="mt-2 break-all font-monoish text-sm font-black text-stone-950">{tenantId}</p>
         </div>
         <div className="rounded-2xl bg-stone-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">Role</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">Papel</p>
           <div className="mt-2"><StatusBadge value={principal.role} /></div>
         </div>
         <div className="rounded-2xl bg-stone-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">API key scope</p>
-          <p className="mt-2 font-bold text-stone-950">{principal.is_admin ? 'admin global' : 'tenant scoped'}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">Escopo da chave</p>
+          <p className="mt-2 font-bold text-stone-950">{principal.is_admin ? 'administrador global' : 'escopo da empresa'}</p>
         </div>
         <div className="rounded-2xl bg-stone-50 p-4">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">Modo</p>
-          <div className="mt-2"><StatusBadge value={offline ? 'erro' : 'active'} label={offline ? 'Fallback' : 'Real'} /></div>
+          <div className="mt-2"><StatusBadge value={offline ? 'erro' : 'active'} label={offline ? 'Contingência' : 'Real'} /></div>
         </div>
       </div>
     </section>

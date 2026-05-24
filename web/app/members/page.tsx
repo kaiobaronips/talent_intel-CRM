@@ -17,11 +17,11 @@ export default async function MembersPage() {
   const admins = memberships.filter((membership) => ['owner', 'admin'].includes(membership.role)).length;
 
   return (
-    <Shell offline={membershipsResult.offline || principal.offline} title="Membros do tenant" subtitle="Controle inicial de acesso SaaS por tenant. Login humano sera conectado a estes memberships.">
+    <Shell offline={membershipsResult.offline || principal.offline} title="Membros da empresa" subtitle="Controle inicial de acesso SaaS por empresa. O login humano será conectado a estas associações.">
       <section className="stagger grid gap-4 md:grid-cols-3">
         <MetricCard label="Membros" value={memberships.length} accent="ink" />
-        <MetricCard label="Admins" value={admins} accent="amber" />
-        <MetricCard label="Tenant" value={tenantId} accent="blue" />
+        <MetricCard label="Administradores" value={admins} accent="amber" />
+        <MetricCard label="Empresa" value={tenantId} accent="blue" />
       </section>
 
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={membershipsResult.offline || principal.offline} />
@@ -37,9 +37,9 @@ export default async function MembersPage() {
         rows={memberships}
         columns={[
           { key: 'id', label: 'ID', render: (row) => row.id },
-          { key: 'user', label: 'User ID', render: (row) => row.user_id },
+          { key: 'user', label: 'ID do usuário', render: (row) => row.user_id },
           { key: 'email', label: 'E-mail', render: (row) => row.email ?? '-' },
-          { key: 'role', label: 'Role', render: (row) => <StatusBadge value={row.role} /> },
+          { key: 'role', label: 'Papel', render: (row) => <StatusBadge value={row.role} /> },
         ]}
       />
     </Shell>

@@ -30,14 +30,14 @@ export default async function DashboardPage() {
   return (
     <Shell
       offline={offline}
-      title="Control Tower para recrutamento inteligente"
-      subtitle="Uma visao operacional para tenants, candidatos, cadencias por canal, backlog e execucao dos workflows Temporal."
+      title="Painel de controle para recrutamento inteligente"
+      subtitle="Uma visão operacional para empresas, candidatos, cadências por canal, backlog e execução dos fluxos Temporal."
     >
       <section className="stagger grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Tenant ativo" value={tenantResult.data.company_name} detail={tenantResult.data.tier ?? tenantResult.data.id} accent="ink" />
+        <MetricCard label="Empresa ativa" value={tenantResult.data.company_name} detail={tenantResult.data.tier ?? tenantResult.data.id} accent="ink" />
         <MetricCard label="Candidatos" value={candidatesResult.data.pagination.total} detail="base atual" accent="green" />
-        <MetricCard label="Backlog" value={backlogTotal} detail="email + LinkedIn" accent="amber" />
-        <MetricCard label="Workflow runs" value={workflowTotal} detail={`${metrics.workflow_runs.running ?? 0} rodando`} accent="blue" />
+        <MetricCard label="Fila" value={backlogTotal} detail="e-mail + LinkedIn" accent="amber" />
+        <MetricCard label="Execuções" value={workflowTotal} detail={`${metrics.workflow_runs.running ?? 0} em execução`} accent="blue" />
       </section>
 
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={offline || principal.offline} />
@@ -54,20 +54,20 @@ export default async function DashboardPage() {
           rows={candidates}
           columns={[
             { key: 'name', label: 'Nome', render: (row) => row.name },
-            { key: 'role', label: 'Cargo', render: (row) => row.current_role ?? 'Nao informado' },
-            { key: 'score', label: 'Score', render: (row) => row.score_overall ?? '-' },
-            { key: 'stage', label: 'Stage', render: (row) => <StatusBadge value={row.stage} /> },
+            { key: 'role', label: 'Cargo', render: (row) => row.current_role ?? 'Não informado' },
+            { key: 'score', label: 'Pontuação', render: (row) => row.score_overall ?? '-' },
+            { key: 'stage', label: 'Etapa', render: (row) => <StatusBadge value={row.stage} /> },
           ]}
         />
 
         <div className="rounded-[2rem] border border-stone-200 bg-stone-950 p-5 text-stone-50 shadow-[0_24px_70px_rgba(41,37,36,0.16)]">
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-200">Canais</p>
-          <h2 className="mt-2 font-display text-3xl font-black tracking-[-0.05em]">Fila de contato</h2>
+          <h2 className="mt-2 font-display text-3xl font-black tracking-[-0.05em]">Fila de contatos</h2>
           <div className="mt-6 space-y-3">
             {metrics.channel_backlog.map((item) => (
               <div key={item.channel} className="rounded-2xl border border-white/10 bg-white/8 p-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold capitalize">{item.channel}</span>
+                  <span className="font-bold capitalize">{item.channel === 'linkedin' ? 'LinkedIn' : 'E-mail'}</span>
                   <span className="font-monoish text-2xl font-black">{item.pending}</span>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
@@ -77,20 +77,20 @@ export default async function DashboardPage() {
             ))}
           </div>
           <Link href="/interactions" className="mt-6 inline-flex rounded-full bg-amber-300 px-5 py-3 text-sm font-black text-stone-950 transition hover:bg-amber-200">
-            Ver interacoes
+            Ver interações
           </Link>
         </div>
       </section>
 
       <DataTable<Interaction>
-        eyebrow="Cadencia"
-        title="Interacoes em movimento"
+        eyebrow="Cadência"
+        title="Interações em movimento"
         rows={interactions}
         columns={[
           { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_name ?? row.candidate_id },
           { key: 'channel', label: 'Canal', render: (row) => <StatusBadge value={row.channel} /> },
-          { key: 'status', label: 'Interacao', render: (row) => <StatusBadge value={row.interaction_status} /> },
-          { key: 'next', label: 'Proxima acao', render: (row) => row.next_action ?? '-' },
+          { key: 'status', label: 'Interação', render: (row) => <StatusBadge value={row.interaction_status} /> },
+          { key: 'next', label: 'Próxima ação', render: (row) => row.next_action ?? '-' },
         ]}
       />
     </Shell>

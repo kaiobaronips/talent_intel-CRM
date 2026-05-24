@@ -20,7 +20,7 @@ export function MembershipUpsertForm({ tenantId }: { tenantId: string }) {
       <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Adicionar membro</h2>
       <div className="mt-5 grid gap-4 md:grid-cols-4 md:items-end">
         <label className="grid gap-2 text-sm font-bold text-stone-700">
-          User ID
+          ID do usuário
           <input name="user_id" required placeholder="supabase-user-id" className="rounded-2xl border border-stone-200 bg-white px-4 py-3 font-medium outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" />
         </label>
         <label className="grid gap-2 text-sm font-bold text-stone-700">
@@ -28,12 +28,12 @@ export function MembershipUpsertForm({ tenantId }: { tenantId: string }) {
           <input name="email" type="email" placeholder="user@empresa.com" className="rounded-2xl border border-stone-200 bg-white px-4 py-3 font-medium outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" />
         </label>
         <label className="grid gap-2 text-sm font-bold text-stone-700">
-          Role
+          Papel
           <select name="role" defaultValue="viewer" className="rounded-2xl border border-stone-200 bg-white px-4 py-3 font-medium outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100">
-            <option value="owner">owner</option>
-            <option value="admin">admin</option>
-            <option value="recruiter">recruiter</option>
-            <option value="viewer">viewer</option>
+            <option value="owner">proprietário</option>
+            <option value="admin">administrador</option>
+            <option value="recruiter">recrutador</option>
+            <option value="viewer">leitor</option>
           </select>
         </label>
         <button type="submit" className="rounded-full bg-stone-950 px-5 py-3 text-sm font-black text-stone-50 transition hover:bg-amber-700">Salvar membro</button>
@@ -53,7 +53,7 @@ export function MembershipDeleteForm({ tenantId }: { tenantId: string }) {
       <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Remover membro</h2>
       <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
         <label className="grid gap-2 text-sm font-bold text-stone-700">
-          Membership ID
+          ID da associação
           <input name="membership_id" required placeholder="uuid-do-membro" className="rounded-2xl border border-stone-200 bg-white px-4 py-3 font-medium outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" />
         </label>
         <button type="submit" className="rounded-full bg-stone-950 px-5 py-3 text-sm font-black text-stone-50 transition hover:bg-rose-700">Remover</button>

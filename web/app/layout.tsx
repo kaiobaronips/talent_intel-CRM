@@ -4,7 +4,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Talent Intel CRM',
-  description: 'Commercial HR intelligence console for candidate sourcing, enrichment and cadence operations.',
+  description: 'Console comercial de RH para sourcing de candidatos, enriquecimento e cadências operacionais.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

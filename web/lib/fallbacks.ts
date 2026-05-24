@@ -21,7 +21,7 @@ export const fallbackCandidates: Paginated<Candidate> = {
       city: 'Sao Paulo',
       state: 'SP',
       current_role: 'Assessor de Investimentos',
-      current_company: 'XPTO Advisory',
+      current_company: 'XPTO Assessoria',
       target_profile: 'Financeiro comercial',
       seniority: 'Senior',
       classification: 'A',
@@ -35,8 +35,8 @@ export const fallbackCandidates: Paginated<Candidate> = {
       linkedin_url: 'https://linkedin.com/in/mariana',
       city: 'Curitiba',
       state: 'PR',
-      current_role: 'Financial Advisor',
-      current_company: 'Private Office',
+      current_role: 'Consultor Financeiro',
+      current_company: 'Escritório Privado',
       target_profile: 'Hunter financeiro',
       seniority: 'Pleno',
       classification: 'B',
@@ -55,7 +55,7 @@ export const fallbackInteractions: Paginated<Interaction> = {
       candidate_name: 'Adalberto Neto',
       channel: 'linkedin',
       interaction_status: 'Enfileirado',
-      next_action: 'Aguardando execucao',
+      next_action: 'Aguardando execução',
       message_sent: 'Convite curto preparado',
     },
     {
@@ -84,7 +84,7 @@ export const fallbackMetrics: TenantMetrics = {
 };
 
 export const fallbackApiKeys: ApiKey[] = [
-  { id: 'sample-key-readonly', name: 'Demo read-only key', status: 'active' },
+  { id: 'sample-key-readonly', name: 'Chave de leitura da demonstração', status: 'active' },
 ];
 
 export const fallbackAuditEvents: Paginated<AuditEvent> = {
@@ -111,7 +111,7 @@ export const fallbackWorkflowRuns: Paginated<WorkflowRun> = {
       id: 'workflow-sample-001',
       tenant_id: defaultTenantId,
       candidate_id: 'candidate-sample-001',
-      workflow_name: 'CandidateLifecycleWorkflow',
+      workflow_name: 'Fluxo de vida do candidato',
       workflow_id: 'candidate-lifecycle::demo',
       run_id: 'run-sample-001',
       status: 'Completed',
