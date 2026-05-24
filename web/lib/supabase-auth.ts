@@ -1,8 +1,9 @@
 import { cookies } from 'next/headers';
-import { sessionCookieName } from './session';
+import { refreshCookieName, sessionCookieName } from './session';
 
 export type SupabaseTokenPayload = {
   access_token?: string;
+  refresh_token?: string;
   expires_in?: number;
   error?: string;
   error_description?: string;
@@ -25,19 +26,26 @@ export function requireSupabaseAuthConfig() {
   return { ok: true as const, message: '', config };
 }
 
+export function authCookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge,
+  };
+}
+
 export async function setSessionCookie(payload: SupabaseTokenPayload): Promise<boolean> {
   if (!payload.access_token) {
     return false;
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(sessionCookieName, payload.access_token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: payload.expires_in ?? 3600,
-  });
+  cookieStore.set(sessionCookieName, payload.access_token, authCookieOptions(payload.expires_in ?? 3600));
+  if (payload.refresh_token) {
+    cookieStore.set(refreshCookieName, payload.refresh_token, authCookieOptions(60 * 60 * 24 * 30));
+  }
   return true;
 }
 

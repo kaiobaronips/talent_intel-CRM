@@ -13,6 +13,7 @@ export type Principal = {
 };
 
 export const sessionCookieName = 'ticrm_session';
+export const refreshCookieName = 'ticrm_refresh';
 export const oauthVerifierCookieName = 'ticrm_oauth_verifier';
 
 export async function getSessionToken(): Promise<string> {
@@ -43,7 +44,7 @@ export async function requireAuthenticatedPrincipal() {
       redirect('/login?error=Seu%20login%20foi%20autenticado%2C%20mas%20ainda%20nao%20esta%20vinculado%20a%20uma%20empresa.');
     }
     if (principal.status === 401) {
-      redirect('/login?error=Sessao%20expirada.%20Entre%20novamente.');
+      redirect('/auth/refresh');
     }
     redirect('/login');
   }

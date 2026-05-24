@@ -22,6 +22,19 @@
    - `/Users/kaiobp/SOREN/.venv/bin/python -m pytest -q` — OK (25 testes)
    - `/Users/kaiobp/SOREN/.venv/bin/ruff check .` — OK
 
+### Fechamento full-auto Codex
+1. Membership por e-mail implementado:
+   - `/members` usa e-mail como campo principal.
+   - A API resolve `auth.users.email` para `user_id` e grava `tenant_memberships`.
+   - Usuario autenticado sem membership recebe mensagem clara no `/login`.
+2. Refresh de sessao implementado:
+   - Login e callback OAuth armazenam access token e refresh token em cookies `httpOnly`.
+   - `/auth/refresh` renova access token via Supabase quando a API retorna `401`.
+   - Logout revoga sessao Supabase e limpa cookies de access/refresh.
+3. Readiness de producao reforcado:
+   - `make prod-readiness` tambem checa `NEXT_PUBLIC_SITE_URL` e formatos HTTPS de URLs publicas.
+   - `make prepare-web-env` escreve `NEXT_PUBLIC_SITE_URL` no `web/.env.local`.
+
 ### Google OAuth ativado no Supabase Auth
 1. Token `SUPABASE_ACCESS_TOKEN` atualizado no `.env` (o anterior era inválido).
    - Novo token armazenado em `.env` (não versionar).
@@ -47,16 +60,10 @@
 
 ## Pendências para próxima sessão
 
-### P1 — Acompanhamento obrigatório
-1. **Membership de usuário Google**: a API Python aceita JWTs de usuários Google porque valida o JWT Supabase por `SUPABASE_JWT_SECRET`; porém o usuário precisa existir em `tenant_memberships`. O comportamento atual é rejeitar com `403 User is not linked to a tenant` quando não houver vínculo. Manter esse modelo ou decidir se haverá auto-criação controlada.
-
-### P2 — Ajustes para produção
-2. **`NEXT_PUBLIC_SITE_URL`**: Em produção (Vercel), alterar para a URL real do app.
-3. **Variáveis de ambiente no Vercel**: Configurar `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `NEXT_PUBLIC_SITE_URL` no Vercel dashboard ou via `vercel env`.
-4. **Redirect URL para domínio custom**: Se o app tiver domínio próprio (ex: `app.soreninvestimentos.com.br`), adicionar `https://<dominio>/auth/callback` tanto no Supabase Auth quanto no Google Console.
-
-### P3 — Melhorias
-5. **Refresh token**: O cookie de sessão atual usa `maxAge: expires_in` (~3600s). Considerar implementar refresh automático.
+### P1 — Externo/deploy
+1. **Vercel env**: Confirmar no dashboard Vercel `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_TICRM_API_URL` e variaveis server-side da UI/API.
+2. **Dominio custom**: Se o app tiver dominio proprio (ex: `app.soreninvestimentos.com.br`), adicionar `https://<dominio>/auth/callback` tanto no Supabase Auth quanto no Google Console.
+3. **Smoke em producao**: apos deploy, testar login Google, `/members` por e-mail, logout e refresh apos expiracao/401.
 
 ## Arquivos relevantes
 
@@ -64,6 +71,7 @@
 |---------|-----------|
 | `web/app/auth/google/route.ts` | Inicia fluxo OAuth PKCE com Supabase |
 | `web/app/auth/callback/route.ts` | Recebe callback, troca code por JWT, seta cookie |
+| `web/app/auth/refresh/route.ts` | Renova access token com refresh token Supabase |
 | `web/lib/supabase-auth.ts` | Config helpers (`requireSupabaseAuthConfig`) |
 | `web/lib/session.ts` | Cookie names, `getSessionToken()` |
 | `web/components/LoginForm.tsx` | UI com botão Google + form email/senha |

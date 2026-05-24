@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { oauthVerifierCookieName, sessionCookieName } from '@/lib/session';
-import { authErrorMessage, requireSupabaseAuthConfig, type SupabaseTokenPayload } from '@/lib/supabase-auth';
+import { oauthVerifierCookieName, refreshCookieName, sessionCookieName } from '@/lib/session';
+import { authCookieOptions, authErrorMessage, requireSupabaseAuthConfig, type SupabaseTokenPayload } from '@/lib/supabase-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,13 +46,10 @@ export async function GET(request: Request) {
   }
 
   const redirectResponse = NextResponse.redirect(new URL('/', request.url));
-  redirectResponse.cookies.set(sessionCookieName, payload.access_token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: payload.expires_in ?? 3600,
-  });
+  redirectResponse.cookies.set(sessionCookieName, payload.access_token, authCookieOptions(payload.expires_in ?? 3600));
+  if (payload.refresh_token) {
+    redirectResponse.cookies.set(refreshCookieName, payload.refresh_token, authCookieOptions(60 * 60 * 24 * 30));
+  }
   redirectResponse.cookies.delete(oauthVerifierCookieName);
   return redirectResponse;
 }

@@ -177,7 +177,7 @@ Configurar em `web/.env.local`:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key>` para login humano
 - `NEXT_PUBLIC_DEFAULT_TENANT_ID=api-controlled-003`
 
-A chave da API e usada apenas server-side pelo Next.js. Em modo SaaS, o login humano grava um cookie httpOnly e a UI chama a API com `Authorization: Bearer`.
+A chave da API e usada apenas server-side pelo Next.js. Em modo SaaS, o login humano grava cookies httpOnly de sessao/refresh e a UI chama a API com `Authorization: Bearer`.
 Para login Google, o Supabase Auth deve ter o provider Google ativo e o redirect `/auth/callback` cadastrado.
 
 Ativar Google OAuth via Management API:
@@ -215,7 +215,7 @@ Antes de deploy/staging, rode:
 make prod-readiness
 ```
 
-O comando valida variaveis obrigatorias sem imprimir valores sensiveis e bloqueia producao com `TICRM_ALLOW_INSECURE_DEV_AUTH=true`.
+O comando valida variaveis obrigatorias sem imprimir valores sensiveis, bloqueia producao com `TICRM_ALLOW_INSECURE_DEV_AUTH=true` e checa URLs publicas de Supabase/site.
 
 ## Auth Roadmap
 
@@ -229,7 +229,7 @@ A API possui CRUD inicial para memberships de tenant:
 - `POST /v1/tenants/{tenant_id}/memberships`
 - `DELETE /v1/tenants/{tenant_id}/memberships/{membership_id}`
 
-A UI possui `/members` para gerenciar membros. Esses registros definem a empresa e o papel usados pelo login humano SaaS.
+A UI possui `/members` para gerenciar membros. O formulario aceita e-mail como caminho principal: a API resolve o usuario em `auth.users` e grava `tenant_memberships`. Esses registros definem a empresa e o papel usados pelo login humano SaaS.
 
 ## Workflow Runs
 

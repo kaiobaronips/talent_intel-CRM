@@ -34,8 +34,7 @@ Em outro terminal:
 ```bash
 cd /Users/kaiobp/Talent-Intel-CRM/web
 cp .env.local.example .env.local
-# editar TICRM_API_KEY, NEXT_PUBLIC_DEFAULT_TENANT_ID, NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
-# para Google OAuth local, definir tambem NEXT_PUBLIC_SITE_URL=http://localhost:3000
+# editar TICRM_API_KEY, NEXT_PUBLIC_DEFAULT_TENANT_ID, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY e NEXT_PUBLIC_SITE_URL
 npm run dev
 ```
 
@@ -56,7 +55,7 @@ export TICRM_BOOTSTRAP_ROLE=owner
 make bootstrap-tenant-member
 ```
 
-Se voce ja tiver o `user_id` do Supabase Auth, use `TICRM_BOOTSTRAP_USER_ID` no lugar do e-mail.
+Se voce ja tiver o `user_id` do Supabase Auth, use `TICRM_BOOTSTRAP_USER_ID` no lugar do e-mail. Pela UI, use `/members` e informe o e-mail do usuario; a API resolve o `user_id` no Supabase Auth automaticamente.
 Para criar o usuario automaticamente, informe tambem `SUPABASE_SERVICE_ROLE_KEY` e `TICRM_BOOTSTRAP_USER_PASSWORD`.
 
 Acessar:
