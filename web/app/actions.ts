@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { apiMutation, getDefaultTenantId } from '@/lib/api';
 import { getSessionToken, sessionCookieName } from '@/lib/session';
-import { authErrorMessage, requireSupabaseAuthConfig, setSessionCookie, type SupabaseTokenPayload } from '@/lib/supabase-auth';
+import { authErrorMessage, requireSupabaseAuthConfig, revokeSupabaseSession, setSessionCookie, type SupabaseTokenPayload } from '@/lib/supabase-auth';
 
 export type ActionState = {
   ok: boolean;
@@ -65,6 +65,8 @@ export async function loginAction(_previousState: ActionState, formData: FormDat
 }
 
 export async function logoutAction(): Promise<void> {
+  const token = await getSessionToken();
+  await revokeSupabaseSession(token);
   const cookieStore = await cookies();
   cookieStore.delete(sessionCookieName);
   redirect('/login');

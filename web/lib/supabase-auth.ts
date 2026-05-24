@@ -41,6 +41,22 @@ export async function setSessionCookie(payload: SupabaseTokenPayload): Promise<b
   return true;
 }
 
+export async function revokeSupabaseSession(accessToken: string): Promise<void> {
+  const authConfig = requireSupabaseAuthConfig();
+  if (!accessToken || !authConfig.ok) {
+    return;
+  }
+
+  await fetch(`${authConfig.config.url}/auth/v1/logout`, {
+    method: 'POST',
+    headers: {
+      apikey: authConfig.config.anonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: 'no-store',
+  }).catch(() => undefined);
+}
+
 export function authErrorMessage(payload: SupabaseTokenPayload, fallback = 'Login não autorizado.'): string {
   return payload.error_description ?? payload.msg ?? payload.error ?? fallback;
 }
