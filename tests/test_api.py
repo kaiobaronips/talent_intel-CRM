@@ -181,6 +181,46 @@ def test_tenant_membership_routes(monkeypatch) -> None:
     assert deleted.json()["data"]["membership"]["id"] == "member-001"
 
 
+def test_tenant_membership_resolves_user_by_email(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "find_auth_user_by_email", lambda email: {"id": "user-from-email", "email": email})
+    monkeypatch.setattr(api, "upsert_tenant_membership", lambda payload: {"id": "member-001", **payload})
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/memberships",
+        json={"email": "user@example.com", "role": "viewer"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["data"]["membership"]["user_id"] == "user-from-email"
+    assert response.json()["data"]["membership"]["email"] == "user@example.com"
+
+
+def test_tenant_membership_requires_user_or_email(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/memberships",
+        json={"role": "viewer"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "User ID or e-mail is required"
+
+
+def test_tenant_membership_email_not_found(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "find_auth_user_by_email", lambda _email: {})
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/memberships",
+        json={"email": "missing@example.com", "role": "viewer"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Supabase Auth user not found for e-mail"
+
+
 def test_tenant_membership_delete_not_found(monkeypatch) -> None:
     monkeypatch.setattr(api, "delete_tenant_membership", lambda _tenant_id, _membership_id: {})
 

@@ -20,12 +20,12 @@ export function MembershipUpsertForm({ tenantId }: { tenantId: string }) {
       <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Adicionar membro</h2>
       <div className="mt-5 grid gap-4 md:grid-cols-4 md:items-end">
         <label className="grid gap-2 text-sm font-bold text-stone-700">
-          ID do usuário
-          <input name="user_id" required placeholder="supabase-user-id" className="rounded-2xl border border-stone-200 bg-white px-4 py-3 font-medium outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" />
+          E-mail
+          <input name="email" type="email" required placeholder="user@empresa.com" className="rounded-2xl border border-stone-200 bg-white px-4 py-3 font-medium outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" />
         </label>
         <label className="grid gap-2 text-sm font-bold text-stone-700">
-          E-mail
-          <input name="email" type="email" placeholder="user@empresa.com" className="rounded-2xl border border-stone-200 bg-white px-4 py-3 font-medium outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" />
+          ID do usuário
+          <input name="user_id" placeholder="opcional" className="rounded-2xl border border-stone-200 bg-white px-4 py-3 font-medium outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" />
         </label>
         <label className="grid gap-2 text-sm font-bold text-stone-700">
           Papel

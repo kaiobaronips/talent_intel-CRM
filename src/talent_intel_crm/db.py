@@ -169,6 +169,21 @@ def find_tenant_membership_by_user(user_id: str) -> dict[str, Any]:
             return dict(cur.fetchone() or {})
 
 
+def find_auth_user_by_email(email: str) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select id::text as id, email
+                from auth.users
+                where lower(email) = lower(%s)
+                limit 1
+                """,
+                (email,),
+            )
+            return dict(cur.fetchone() or {})
+
+
 def delete_tenant_membership(tenant_id: str, membership_id: str) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:

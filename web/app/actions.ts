@@ -198,8 +198,8 @@ export async function upsertMembershipAction(_previousState: ActionState, formDa
   const email = text(formData, 'email');
   const role = text(formData, 'role') || 'viewer';
 
-  if (!userId) {
-    return { ...initialError, message: 'O ID do usuário é obrigatório.' };
+  if (!userId && !email) {
+    return { ...initialError, message: 'Informe o e-mail ou o ID do usuário.' };
   }
 
   const result = await apiMutation<{ membership: { id: string; role: string } }>(`/v1/tenants/${tenantId}/memberships`, 'POST', {
@@ -214,7 +214,7 @@ export async function upsertMembershipAction(_previousState: ActionState, formDa
 
   revalidatePath('/members');
   revalidatePath(`/tenants/${tenantId}`);
-  return { ok: true, message: `Membro ${userId} salvo como ${result.data?.membership?.role ?? role}.` };
+  return { ok: true, message: `Membro ${email || userId} salvo como ${result.data?.membership?.role ?? role}.` };
 }
 
 export async function deleteMembershipAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {

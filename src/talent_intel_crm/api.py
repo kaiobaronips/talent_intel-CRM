@@ -15,6 +15,7 @@ from talent_intel_crm.config import TemporalConfig
 from talent_intel_crm.db import (
     database_ready,
     delete_tenant_membership,
+    find_auth_user_by_email,
     get_candidate,
     get_tenant,
     insert_tenant_api_key,
@@ -82,7 +83,7 @@ class CandidateCreateRequest(BaseModel):
 
 
 class TenantMembershipUpsertRequest(BaseModel):
-    user_id: str = Field(min_length=2, max_length=240)
+    user_id: str = Field(default="", max_length=240)
     email: str = Field(default="", max_length=320)
     role: str = Field(default="viewer", pattern="^(owner|admin|recruiter|viewer)$")
 
@@ -214,11 +215,21 @@ async def upsert_membership(
     require_tenant_admin(principal, tenant_id)
     if not tenant_exists(tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    user_id = payload.user_id.strip()
+    email = payload.email.strip()
+    if not user_id and not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User ID or e-mail is required")
+    if not user_id:
+        auth_user = find_auth_user_by_email(email)
+        if not auth_user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Supabase Auth user not found for e-mail")
+        user_id = str(auth_user["id"])
+        email = str(auth_user.get("email") or email)
     membership = upsert_tenant_membership(
         {
             "tenant_id": tenant_id,
-            "user_id": payload.user_id,
-            "email": payload.email,
+            "user_id": user_id,
+            "email": email,
             "role": payload.role,
         }
     )
