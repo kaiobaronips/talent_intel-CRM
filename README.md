@@ -132,6 +132,15 @@ ticrm-migrate status
 ticrm-migrate apply
 ```
 
+Bootstrap do primeiro membro SaaS:
+
+```bash
+export TICRM_BOOTSTRAP_TENANT_ID=api-controlled-003
+export TICRM_BOOTSTRAP_USER_EMAIL=<email-do-usuario-supabase-auth>
+export TICRM_BOOTSTRAP_ROLE=owner
+make bootstrap-tenant-member
+```
+
 ## Notion Mirror
 
 O espelhamento no Notion e opcional e lateral:

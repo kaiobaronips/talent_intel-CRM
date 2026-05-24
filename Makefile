@@ -1,4 +1,4 @@
-.PHONY: test lint web-typecheck web-lint web-build validate smoke-api prepare-web-env
+.PHONY: test lint web-typecheck web-lint web-build validate smoke-api prepare-web-env bootstrap-tenant-member
 
 test:
 	pytest -q
@@ -22,6 +22,9 @@ smoke-api:
 
 prepare-web-env:
 	python3 scripts/prepare_web_env.py
+
+bootstrap-tenant-member:
+	python3 scripts/bootstrap_tenant_member.py
 
 prod-readiness:
 	python3 scripts/check_production_readiness.py

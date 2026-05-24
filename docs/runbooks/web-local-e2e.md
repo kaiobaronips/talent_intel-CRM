@@ -12,6 +12,7 @@ source /Users/kaiobp/SOREN/.venv/bin/activate
 export TICRM_ADMIN_API_KEY=<admin-key>
 export TICRM_ALLOW_INSECURE_DEV_AUTH=false
 export SUPABASE_DB_URL=<supabase-postgres-url>
+export SUPABASE_JWT_SECRET=<supabase-jwt-secret>
 export TEMPORAL_TARGET_HOST=<temporal-host>
 export TEMPORAL_NAMESPACE=<temporal-namespace>
 export TEMPORAL_API_KEY=<temporal-api-key>
@@ -33,7 +34,7 @@ Em outro terminal:
 ```bash
 cd /Users/kaiobp/Talent-Intel-CRM/web
 cp .env.local.example .env.local
-# editar TICRM_API_KEY e NEXT_PUBLIC_DEFAULT_TENANT_ID
+# editar TICRM_API_KEY, NEXT_PUBLIC_DEFAULT_TENANT_ID, NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
 npm run dev
 ```
 
@@ -42,6 +43,24 @@ Acessar:
 - `http://localhost:3000/system`: API, Postgres e Temporal devem aparecer prontos.
 - `http://localhost:3000/`: dashboard e formularios operacionais.
 - `http://localhost:3000/tenants/<tenant-id>`: tenant, chaves, candidatos e interacoes.
+
+## 2.1. Login humano
+
+Antes de testar `/login`, o usuario precisa existir no Supabase Auth e estar vinculado ao tenant:
+
+```bash
+export TICRM_BOOTSTRAP_TENANT_ID=api-controlled-003
+export TICRM_BOOTSTRAP_USER_EMAIL=<email-do-usuario>
+export TICRM_BOOTSTRAP_ROLE=owner
+make bootstrap-tenant-member
+```
+
+Se voce ja tiver o `user_id` do Supabase Auth, use `TICRM_BOOTSTRAP_USER_ID` no lugar do e-mail.
+Para criar o usuario automaticamente, informe tambem `SUPABASE_SERVICE_ROLE_KEY` e `TICRM_BOOTSTRAP_USER_PASSWORD`.
+
+Acessar:
+
+- `http://localhost:3000/login`
 
 ## 3. Teste controlado
 
