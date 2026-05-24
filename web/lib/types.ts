@@ -92,6 +92,8 @@ export type TenantMetrics = {
 export type ApiResult<T> = {
   data: T;
   offline: boolean;
+  status?: number;
+  message?: string;
 };
 
 export type AuditEvent = {

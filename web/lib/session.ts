@@ -39,6 +39,12 @@ export async function requireAuthenticatedPrincipal() {
 
   const principal = await getPrincipal();
   if (principal.offline && !process.env.TICRM_API_KEY) {
+    if (principal.status === 403) {
+      redirect('/login?error=Seu%20login%20foi%20autenticado%2C%20mas%20ainda%20nao%20esta%20vinculado%20a%20uma%20empresa.');
+    }
+    if (principal.status === 401) {
+      redirect('/login?error=Sessao%20expirada.%20Entre%20novamente.');
+    }
     redirect('/login');
   }
   return principal;

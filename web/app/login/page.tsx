@@ -9,11 +9,11 @@ type LoginPageProps = {
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { error } = await searchParams;
   const token = await getSessionToken();
-  if (token) {
+  if (token && !error) {
     redirect('/');
   }
-  const { error } = await searchParams;
 
   return (
     <main className="min-h-screen bg-[var(--surface)] px-4 py-10 text-stone-950">

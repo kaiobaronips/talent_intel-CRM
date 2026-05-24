@@ -52,19 +52,30 @@ export async function apiGetRaw<T>(path: string, fallback: T, options: ApiAuthOp
     });
 
     if (!response.ok) {
-      return { data: fallback, offline: true };
+      const payload = (await response.json().catch(() => ({}))) as ApiEnvelope<T>;
+      return {
+        data: fallback,
+        offline: true,
+        status: response.status,
+        message: payload.detail ?? `API retornou HTTP ${response.status}`,
+      };
     }
 
     const payload = (await response.json()) as ApiEnvelope<T> | T;
     const data = isEnvelope(payload) ? payload.data : payload;
 
     if (data === undefined || data === null) {
-      return { data: fallback, offline: true };
+      return { data: fallback, offline: true, status: response.status, message: 'API retornou resposta vazia.' };
     }
 
-    return { data: data as T, offline: false };
-  } catch {
-    return { data: fallback, offline: true };
+    return { data: data as T, offline: false, status: response.status };
+  } catch (error) {
+    return {
+      data: fallback,
+      offline: true,
+      status: 0,
+      message: error instanceof Error ? error.message : 'Falha desconhecida ao chamar API.',
+    };
   }
 }
 
@@ -142,10 +153,10 @@ export async function getInteractions(tenantId = defaultTenantId, limit = 20, op
 
 export async function getMemberships(tenantId = defaultTenantId, options: ApiAuthOptions = {}): Promise<ApiResult<TenantMembership[]>> {
   const result = await apiGetRaw<MembershipsPayload>(`/v1/tenants/${tenantId}/memberships`, { tenant_id: tenantId, items: fallbackMemberships }, options);
-  return { data: result.data.items, offline: result.offline };
+  return { data: result.data.items, offline: result.offline, status: result.status, message: result.message };
 }
 
 export async function getApiKeys(tenantId = defaultTenantId, options: ApiAuthOptions = {}): Promise<ApiResult<ApiKey[]>> {
   const result = await apiGetRaw<ApiKeysPayload>(`/v1/tenants/${tenantId}/api-keys`, { tenant_id: tenantId, items: fallbackApiKeys }, options);
-  return { data: result.data.items, offline: result.offline };
+  return { data: result.data.items, offline: result.offline, status: result.status, message: result.message };
 }
