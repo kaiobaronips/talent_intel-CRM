@@ -35,6 +35,12 @@
    - `make prod-readiness` tambem checa `NEXT_PUBLIC_SITE_URL` e formatos HTTPS de URLs publicas.
    - `make prepare-web-env` escreve `NEXT_PUBLIC_SITE_URL` no `web/.env.local`.
 
+### Continuação pós-fechamento Codex
+1. `/members` simplificado:
+   - Formulario separado de remocao deixou de ser necessario no fluxo principal.
+   - Cada linha de membro cadastrado agora possui acao direta "Remover".
+   - Reduz dependencia de copiar manualmente o ID da associacao.
+
 ### Google OAuth ativado no Supabase Auth
 1. Token `SUPABASE_ACCESS_TOKEN` atualizado no `.env` (o anterior era inválido).
    - Novo token armazenado em `.env` (não versionar).

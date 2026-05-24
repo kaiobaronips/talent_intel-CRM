@@ -1,6 +1,6 @@
 import { ContextPanel } from '@/components/ContextPanel';
 import { DataTable } from '@/components/DataTable';
-import { MembershipDeleteForm, MembershipUpsertForm } from '@/components/MembershipForms';
+import { MembershipRemoveButton, MembershipUpsertForm } from '@/components/MembershipForms';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -26,9 +26,8 @@ export default async function MembersPage() {
 
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={membershipsResult.offline || principal.offline} />
 
-      <section className="grid gap-6 xl:grid-cols-2">
+      <section className="grid gap-6">
         <MembershipUpsertForm tenantId={tenantId} />
-        <MembershipDeleteForm tenantId={tenantId} />
       </section>
 
       <DataTable<TenantMembership>
@@ -40,6 +39,7 @@ export default async function MembersPage() {
           { key: 'user', label: 'ID do usuário', render: (row) => row.user_id },
           { key: 'email', label: 'E-mail', render: (row) => row.email ?? '-' },
           { key: 'role', label: 'Papel', render: (row) => <StatusBadge value={row.role} /> },
+          { key: 'actions', label: 'Ações', render: (row) => <MembershipRemoveButton tenantId={tenantId} membershipId={row.id} label={row.email || row.user_id} /> },
         ]}
       />
     </Shell>

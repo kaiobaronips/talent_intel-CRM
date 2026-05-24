@@ -229,7 +229,7 @@ A API possui CRUD inicial para memberships de tenant:
 - `POST /v1/tenants/{tenant_id}/memberships`
 - `DELETE /v1/tenants/{tenant_id}/memberships/{membership_id}`
 
-A UI possui `/members` para gerenciar membros. O formulario aceita e-mail como caminho principal: a API resolve o usuario em `auth.users` e grava `tenant_memberships`. Esses registros definem a empresa e o papel usados pelo login humano SaaS.
+A UI possui `/members` para gerenciar membros. O formulario aceita e-mail como caminho principal: a API resolve o usuario em `auth.users` e grava `tenant_memberships`. A remocao pode ser feita diretamente pela linha do membro cadastrado. Esses registros definem a empresa e o papel usados pelo login humano SaaS.
 
 ## Workflow Runs
 
