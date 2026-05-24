@@ -1,4 +1,4 @@
-import { defaultTenantId, fallbackApiKeys, fallbackAuditEvents, fallbackCandidates, fallbackInteractions, fallbackMemberships, fallbackMetrics, fallbackTenant, fallbackWorkflowRuns } from './fallbacks';
+import { defaultTenantId, fallbackApiKeys, fallbackAuditEvents, fallbackCandidates, fallbackInteractions, fallbackMemberships, fallbackMetrics, fallbackTenant, fallbackTenants, fallbackWorkflowRuns } from './fallbacks';
 import type { ApiKey, ApiResult, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMembership, TenantMetrics, WorkflowRun } from './types';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_TICRM_API_URL ?? 'http://localhost:8000';
@@ -104,6 +104,10 @@ function isEnvelope<T>(payload: ApiEnvelope<T> | T): payload is ApiEnvelope<T> {
 
 export function getDefaultTenantId(): string {
   return defaultTenantId;
+}
+
+export async function getTenants(limit = 20): Promise<ApiResult<Paginated<Tenant>>> {
+  return apiGetRaw<Paginated<Tenant>>(`/v1/tenants?page=1&limit=${limit}`, fallbackTenants);
 }
 
 export async function getTenant(tenantId = defaultTenantId): Promise<ApiResult<Tenant>> {

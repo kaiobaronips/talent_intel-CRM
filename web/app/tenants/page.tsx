@@ -1,6 +1,39 @@
-import { redirect } from 'next/navigation';
-import { getDefaultTenantId } from '@/lib/api';
+import Link from 'next/link';
+import { DataTable } from '@/components/DataTable';
+import { MetricCard } from '@/components/MetricCard';
+import { Shell } from '@/components/Shell';
+import { StatusBadge } from '@/components/StatusBadge';
+import { getTenants } from '@/lib/api';
+import type { Tenant } from '@/lib/types';
 
-export default function TenantsPage() {
-  redirect(`/tenants/${getDefaultTenantId()}`);
+export const dynamic = 'force-dynamic';
+
+export default async function TenantsPage() {
+  const tenantsResult = await getTenants(50);
+  const tenants = tenantsResult.data.items;
+  const scale = tenants.filter((tenant) => tenant.tier === 'scale').length;
+  const growth = tenants.filter((tenant) => tenant.tier === 'growth').length;
+
+  return (
+    <Shell offline={tenantsResult.offline} title="Tenants" subtitle="Administracao multiempresa do Talent Intel CRM.">
+      <section className="stagger grid gap-4 md:grid-cols-3">
+        <MetricCard label="Total" value={tenantsResult.data.pagination.total} accent="ink" />
+        <MetricCard label="Scale" value={scale} accent="blue" />
+        <MetricCard label="Growth" value={growth} accent="green" />
+      </section>
+
+      <DataTable<Tenant>
+        eyebrow="SaaS"
+        title="Empresas cadastradas"
+        rows={tenants}
+        columns={[
+          { key: 'company', label: 'Empresa', render: (row) => <Link href={`/tenants/${row.id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.company_name}</Link> },
+          { key: 'id', label: 'Tenant ID', render: (row) => row.id },
+          { key: 'tier', label: 'Plano', render: (row) => <StatusBadge value={row.tier} /> },
+          { key: 'timezone', label: 'Timezone', render: (row) => row.timezone ?? '-' },
+          { key: 'created', label: 'Criado em', render: (row) => row.created_at ?? '-' },
+        ]}
+      />
+    </Shell>
+  );
 }

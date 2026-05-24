@@ -84,6 +84,16 @@ def test_create_candidate_infers_channels(monkeypatch) -> None:
     assert response.json()["data"]["workflow_id"] == "candidate-lifecycle::tenant-001::candidate-001"
 
 
+def test_list_tenants_route(monkeypatch) -> None:
+    monkeypatch.setattr(api, "list_tenants", lambda _page, _limit: {"items": [{"id": "tenant-001"}], "total": 1})
+
+    response = TestClient(api.app).get("/v1/tenants?page=1&limit=10")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["items"] == [{"id": "tenant-001"}]
+    assert response.json()["data"]["pagination"] == {"page": 1, "limit": 10, "total": 1, "pages": 1}
+
+
 def test_read_routes_return_projected_records(monkeypatch) -> None:
     monkeypatch.setattr(
         api,

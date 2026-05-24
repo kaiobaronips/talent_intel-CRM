@@ -19,6 +19,7 @@ from talent_intel_crm.db import (
     get_tenant,
     insert_tenant_api_key,
     list_candidate_interactions,
+    list_tenants,
     list_tenant_api_keys,
     list_tenant_audit_events,
     list_tenant_candidates,
@@ -150,6 +151,17 @@ async def read_current_principal(principal: APIPrincipal = Depends(require_princ
             "is_admin": principal.is_admin,
         }
     )
+
+@app.get("/v1/tenants")
+async def read_tenants(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_admin(principal)
+    result = list_tenants(page, limit)
+    return _success(_page(result["items"], page, limit, result["total"]))
+
 
 @app.post("/v1/tenants", status_code=status.HTTP_202_ACCEPTED)
 async def create_tenant(payload: TenantCreateRequest, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:

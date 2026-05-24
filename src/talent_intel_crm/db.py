@@ -41,6 +41,24 @@ def database_ready() -> bool:
         return False
 
 
+def list_tenants(page: int, limit: int) -> dict[str, Any]:
+    offset = (page - 1) * limit
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute("select count(*) as total from tenants")
+            total = int(cur.fetchone()["total"])
+            cur.execute(
+                """
+                select id, slug, company_name, tier, primary_domain, timezone, metadata_json, created_at, updated_at
+                from tenants
+                order by created_at desc, id desc
+                limit %s offset %s
+                """,
+                (limit, offset),
+            )
+            return {"items": [dict(row) for row in cur.fetchall()], "total": total}
+
+
 def upsert_tenant(payload: dict[str, Any]) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:

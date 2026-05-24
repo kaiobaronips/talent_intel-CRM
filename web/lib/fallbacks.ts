@@ -119,3 +119,8 @@ export const fallbackWorkflowRuns: Paginated<WorkflowRun> = {
   ],
   pagination: { page: 1, limit: 20, total: 1, pages: 1 },
 };
+
+export const fallbackTenants: Paginated<Tenant> = {
+  items: [fallbackTenant],
+  pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+};

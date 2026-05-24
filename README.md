@@ -211,3 +211,7 @@ A UI possui `/members` para gerenciar membros. Esses registros serao a base do l
 ## Workflow Runs
 
 A API expoe `GET /v1/tenants/{tenant_id}/workflow-runs` e a UI possui `/workflows` para observar execucoes Temporal por tenant.
+
+## Tenant Administration
+
+A API expoe `GET /v1/tenants` para admins e a UI possui `/tenants` com listagem multiempresa e link para cada tenant.
