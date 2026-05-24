@@ -32,7 +32,15 @@ def test_read_current_principal() -> None:
     response = TestClient(api.app).get("/v1/me")
 
     assert response.status_code == 200
-    assert response.json()["data"] == {"role": "admin", "tenant_id": "", "api_key_id": "", "is_admin": True}
+    assert response.json()["data"] == {
+        "role": "admin",
+        "tenant_id": "",
+        "api_key_id": "",
+        "is_admin": True,
+        "user_id": "",
+        "email": "",
+        "auth_method": "api_key",
+    }
 
 
 def test_health_is_open() -> None:

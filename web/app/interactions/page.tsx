@@ -10,8 +10,8 @@ import type { Interaction } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export default async function InteractionsPage() {
-  const { tenantId, principal } = await resolveActiveTenantId();
-  const [interactionsResult, metricsResult] = await Promise.all([getInteractions(tenantId, 50), getTenantMetrics(tenantId)]);
+  const { tenantId, principal, authOptions } = await resolveActiveTenantId();
+  const [interactionsResult, metricsResult] = await Promise.all([getInteractions(tenantId, 50, authOptions), getTenantMetrics(tenantId, authOptions)]);
   const interactions = interactionsResult.data.items;
   const linkedin = interactions.filter((interaction) => interaction.channel === 'linkedin').length;
   const email = interactions.filter((interaction) => interaction.channel === 'email').length;

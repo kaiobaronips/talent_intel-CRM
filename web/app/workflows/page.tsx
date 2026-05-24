@@ -10,8 +10,8 @@ import type { WorkflowRun } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export default async function WorkflowsPage() {
-  const { tenantId, principal } = await resolveActiveTenantId();
-  const workflowResult = await getWorkflowRuns(tenantId, 50);
+  const { tenantId, principal, authOptions } = await resolveActiveTenantId();
+  const workflowResult = await getWorkflowRuns(tenantId, 50, authOptions);
   const runs = workflowResult.data.items;
   const completed = runs.filter((run) => run.status === 'Completed').length;
   const running = runs.filter((run) => run.status === 'Running').length;

@@ -1,11 +1,13 @@
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
+import { requireAuthenticatedPrincipal } from '@/lib/session';
 import { getHealthStatus, getReadinessStatus } from '@/lib/system';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SystemPage() {
+  await requireAuthenticatedPrincipal();
   const [healthResult, readinessResult] = await Promise.all([getHealthStatus(), getReadinessStatus()]);
   const offline = healthResult.offline || readinessResult.offline;
   const health = healthResult.data;

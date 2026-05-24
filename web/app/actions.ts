@@ -1,7 +1,10 @@
 'use server';
 
+import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { apiMutation, getDefaultTenantId } from '@/lib/api';
+import { getSessionToken, sessionCookieName } from '@/lib/session';
 
 export type ActionState = {
   ok: boolean;
@@ -22,6 +25,63 @@ function revalidateTenantViews(tenantId: string) {
   revalidatePath(`/tenants/${tenantId}`);
 }
 
+async function authOptions() {
+  const bearerToken = await getSessionToken();
+  return bearerToken ? { bearerToken } : {};
+}
+
+function supabaseAuthConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return { url, anonKey };
+}
+
+export async function loginAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const email = text(formData, 'email');
+  const password = text(formData, 'password');
+  const { url, anonKey } = supabaseAuthConfig();
+
+  if (!email || !password) {
+    return { ...initialError, message: 'E-mail e senha são obrigatórios.' };
+  }
+
+  if (!url || !anonKey) {
+    return { ok: false, message: 'Supabase Auth não está configurado na UI.' };
+  }
+
+  const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      apikey: anonKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password }),
+    cache: 'no-store',
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error_description?: string; msg?: string };
+  if (!response.ok || !payload.access_token) {
+    return { ok: false, message: payload.error_description ?? payload.msg ?? 'Login não autorizado.' };
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(sessionCookieName, payload.access_token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: payload.expires_in ?? 3600,
+  });
+
+  redirect('/');
+}
+
+export async function logoutAction(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(sessionCookieName);
+  redirect('/login');
+}
+
 export async function createTenantAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
   const tenantId = text(formData, 'tenant_id');
   const companyName = text(formData, 'company_name');
@@ -39,7 +99,7 @@ export async function createTenantAction(_previousState: ActionState, formData: 
     tier,
     primary_domain: primaryDomain,
     timezone,
-  });
+  }, await authOptions());
 
   if (!result.ok) {
     return { ok: false, message: result.message };
@@ -72,7 +132,7 @@ export async function createCandidateAction(_previousState: ActionState, formDat
     city,
     email,
     linkedin_url: linkedinUrl,
-  });
+  }, await authOptions());
 
   if (!result.ok) {
     return { ok: false, message: result.message };
@@ -86,7 +146,7 @@ export async function createApiKeyAction(_previousState: ActionState, formData: 
   const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
   const label = text(formData, 'label') || 'default';
 
-  const result = await apiMutation<{ api_key: string; key: { id: string; label?: string } }>(`/v1/tenants/${tenantId}/api-keys`, 'POST', { label });
+  const result = await apiMutation<{ api_key: string; key: { id: string; label?: string } }>(`/v1/tenants/${tenantId}/api-keys`, 'POST', { label }, await authOptions());
 
   if (!result.ok) {
     return { ok: false, message: result.message };
@@ -108,7 +168,7 @@ export async function revokeApiKeyAction(_previousState: ActionState, formData: 
     return { ...initialError, message: 'O ID da chave de API é obrigatório.' };
   }
 
-  const result = await apiMutation<{ tenant_id: string }>(`/v1/tenants/${tenantId}/api-keys/${keyId}`, 'DELETE');
+  const result = await apiMutation<{ tenant_id: string }>(`/v1/tenants/${tenantId}/api-keys/${keyId}`, 'DELETE', undefined, await authOptions());
 
   if (!result.ok) {
     return { ok: false, message: result.message };
@@ -127,7 +187,7 @@ export async function rotateApiKeyAction(_previousState: ActionState, formData: 
     return { ...initialError, message: 'O ID da chave de API é obrigatório.' };
   }
 
-  const result = await apiMutation<{ api_key: string; key: { id: string } }>(`/v1/tenants/${tenantId}/api-keys/${keyId}/rotate`, 'POST', { label });
+  const result = await apiMutation<{ api_key: string; key: { id: string } }>(`/v1/tenants/${tenantId}/api-keys/${keyId}/rotate`, 'POST', { label }, await authOptions());
 
   if (!result.ok) {
     return { ok: false, message: result.message };
@@ -156,7 +216,7 @@ export async function upsertMembershipAction(_previousState: ActionState, formDa
     user_id: userId,
     email,
     role,
-  });
+  }, await authOptions());
 
   if (!result.ok) {
     return { ok: false, message: result.message };
@@ -175,7 +235,7 @@ export async function deleteMembershipAction(_previousState: ActionState, formDa
     return { ...initialError, message: 'O ID da associação é obrigatório.' };
   }
 
-  const result = await apiMutation<{ membership: { id: string } }>(`/v1/tenants/${tenantId}/memberships/${membershipId}`, 'DELETE');
+  const result = await apiMutation<{ membership: { id: string } }>(`/v1/tenants/${tenantId}/memberships/${membershipId}`, 'DELETE', undefined, await authOptions());
 
   if (!result.ok) {
     return { ok: false, message: result.message };

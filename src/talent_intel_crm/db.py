@@ -146,6 +146,29 @@ def list_tenant_memberships(tenant_id: str) -> list[dict[str, Any]]:
             return [dict(row) for row in cur.fetchall()]
 
 
+def find_tenant_membership_by_user(user_id: str) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select id, tenant_id, user_id, email, role, created_at, updated_at
+                from tenant_memberships
+                where user_id = %s
+                order by
+                    case role
+                        when 'owner' then 1
+                        when 'admin' then 2
+                        when 'recruiter' then 3
+                        else 4
+                    end,
+                    created_at desc
+                limit 1
+                """,
+                (user_id,),
+            )
+            return dict(cur.fetchone() or {})
+
+
 def delete_tenant_membership(tenant_id: str, membership_id: str) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:

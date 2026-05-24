@@ -4,6 +4,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
 import { getApiKeys, getCandidates, getInteractions, getTenant, getTenantMetrics } from '@/lib/api';
+import { getSessionToken, requireAuthenticatedPrincipal } from '@/lib/session';
 import type { ApiKey, Candidate, Interaction } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -14,12 +15,15 @@ type TenantPageProps = {
 
 export default async function TenantPage({ params }: TenantPageProps) {
   const { tenantId } = await params;
+  await requireAuthenticatedPrincipal();
+  const token = await getSessionToken();
+  const authOptions = token ? { bearerToken: token } : {};
   const [tenantResult, metricsResult, candidatesResult, interactionsResult, keysResult] = await Promise.all([
-    getTenant(tenantId),
-    getTenantMetrics(tenantId),
-    getCandidates(tenantId, 8),
-    getInteractions(tenantId, 8),
-    getApiKeys(tenantId),
+    getTenant(tenantId, authOptions),
+    getTenantMetrics(tenantId, authOptions),
+    getCandidates(tenantId, 8, authOptions),
+    getInteractions(tenantId, 8, authOptions),
+    getApiKeys(tenantId, authOptions),
   ]);
 
   const offline = tenantResult.offline || metricsResult.offline || candidatesResult.offline || interactionsResult.offline || keysResult.offline;

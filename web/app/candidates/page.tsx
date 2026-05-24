@@ -11,8 +11,8 @@ import type { Candidate } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export default async function CandidatesPage() {
-  const { tenantId, principal } = await resolveActiveTenantId();
-  const [tenantResult, candidatesResult] = await Promise.all([getTenant(tenantId), getCandidates(tenantId, 50)]);
+  const { tenantId, principal, authOptions } = await resolveActiveTenantId();
+  const [tenantResult, candidatesResult] = await Promise.all([getTenant(tenantId, authOptions), getCandidates(tenantId, 50, authOptions)]);
   const candidates = candidatesResult.data.items;
   const withEmail = candidates.filter((candidate) => Boolean(candidate.email)).length;
   const withLinkedIn = candidates.filter((candidate) => Boolean(candidate.linkedin_url)).length;

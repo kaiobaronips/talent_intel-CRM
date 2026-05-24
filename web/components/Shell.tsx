@@ -1,18 +1,22 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
+import { logoutAction } from '@/app/actions';
 import { getDefaultTenantId } from '@/lib/api';
+import { getPrincipal, getSessionToken } from '@/lib/session';
 
-const navItems = [
+function navItems(activeTenantId: string) {
+  return [
   { href: '/', label: 'Painel' },
-  { href: `/tenants/${getDefaultTenantId()}`, label: 'Empresa' },
+  { href: `/tenants/${activeTenantId}`, label: 'Empresa' },
   { href: '/candidates', label: 'Candidatos' },
   { href: '/interactions', label: 'Interações' },
   { href: '/members', label: 'Membros' },
   { href: '/workflows', label: 'Fluxos' },
   { href: '/audit', label: 'Auditoria' },
   { href: '/system', label: 'Sistema' },
-];
+  ];
+}
 
 type ShellProps = {
   children: ReactNode;
@@ -21,7 +25,11 @@ type ShellProps = {
   subtitle?: string;
 };
 
-export function Shell({ children, offline = false, title = 'Talent Intel CRM', subtitle }: ShellProps) {
+export async function Shell({ children, offline = false, title = 'Talent Intel CRM', subtitle }: ShellProps) {
+  const hasSession = Boolean(await getSessionToken());
+  const principal = await getPrincipal();
+  const activeTenantId = principal.data.tenant_id || getDefaultTenantId();
+
   return (
     <div className="min-h-screen overflow-hidden bg-[var(--surface)] text-stone-950">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(250,204,21,0.22),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(45,212,191,0.18),transparent_26%),linear-gradient(135deg,#fff7ed_0%,#f8fafc_48%,#ecfeff_100%)]" />
@@ -34,7 +42,7 @@ export function Shell({ children, offline = false, title = 'Talent Intel CRM', s
         </Link>
 
         <nav className="mt-6 space-y-2">
-          {navItems.map((item) => (
+          {navItems(activeTenantId).map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -52,6 +60,13 @@ export function Shell({ children, offline = false, title = 'Talent Intel CRM', s
             <span className={clsx('h-2.5 w-2.5 rounded-full', offline ? 'bg-amber-500' : 'bg-emerald-500')} />
             {offline ? 'Modo demonstração' : 'Conectada'}
           </div>
+          {hasSession ? (
+            <form action={logoutAction} className="mt-4">
+              <button type="submit" className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-black text-stone-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">
+                Sair
+              </button>
+            </form>
+          ) : null}
         </div>
       </aside>
 

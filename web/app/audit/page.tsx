@@ -10,8 +10,8 @@ import type { AuditEvent } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export default async function AuditPage() {
-  const { tenantId, principal } = await resolveActiveTenantId();
-  const auditResult = await getAuditEvents(tenantId, 50);
+  const { tenantId, principal, authOptions } = await resolveActiveTenantId();
+  const auditResult = await getAuditEvents(tenantId, 50, authOptions);
   const events = auditResult.data.items;
   const candidateEvents = events.filter((event) => event.candidate_id).length;
   const systemEvents = events.filter((event) => event.actor_type === 'system').length;

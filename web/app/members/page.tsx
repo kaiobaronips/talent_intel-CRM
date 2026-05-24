@@ -11,8 +11,8 @@ import type { TenantMembership } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export default async function MembersPage() {
-  const { tenantId, principal } = await resolveActiveTenantId();
-  const membershipsResult = await getMemberships(tenantId);
+  const { tenantId, principal, authOptions } = await resolveActiveTenantId();
+  const membershipsResult = await getMemberships(tenantId, authOptions);
   const memberships = membershipsResult.data;
   const admins = memberships.filter((membership) => ['owner', 'admin'].includes(membership.role)).length;
 

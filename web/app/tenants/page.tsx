@@ -4,12 +4,15 @@ import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
 import { getTenants } from '@/lib/api';
+import { requireAuthenticatedPrincipal, getSessionToken } from '@/lib/session';
 import type { Tenant } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TenantsPage() {
-  const tenantsResult = await getTenants(50);
+  await requireAuthenticatedPrincipal();
+  const token = await getSessionToken();
+  const tenantsResult = await getTenants(50, token ? { bearerToken: token } : {});
   const tenants = tenantsResult.data.items;
   const scale = tenants.filter((tenant) => tenant.tier === 'scale').length;
   const growth = tenants.filter((tenant) => tenant.tier === 'growth').length;

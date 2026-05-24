@@ -162,10 +162,12 @@ npm run dev
 Configurar em `web/.env.local`:
 
 - `NEXT_PUBLIC_TICRM_API_URL=http://localhost:8000`
-- `TICRM_API_KEY=<admin-ou-tenant-api-key>`
+- `TICRM_API_KEY=<admin-ou-tenant-api-key>` para modo server-to-server/dev
+- `NEXT_PUBLIC_SUPABASE_URL=<supabase-url>` para login humano
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key>` para login humano
 - `NEXT_PUBLIC_DEFAULT_TENANT_ID=api-controlled-003`
 
-A chave da API e usada apenas server-side pelo Next.js.
+A chave da API e usada apenas server-side pelo Next.js. Em modo SaaS, o login humano grava um cookie httpOnly e a UI chama a API com `Authorization: Bearer`.
 
 ## Local Validation Commands
 
@@ -196,7 +198,7 @@ O comando valida variaveis obrigatorias sem imprimir valores sensiveis e bloquei
 
 ## Auth Roadmap
 
-A estrategia de login SaaS esta documentada em `docs/auth-strategy.md`. O projeto mantem API keys para automacoes server-to-server e prepara `tenant_memberships` para login humano por tenant.
+A estrategia de login SaaS esta documentada em `docs/auth-strategy.md`. O projeto mantem API keys para automacoes server-to-server e usa Supabase Auth + `tenant_memberships` para login humano por tenant. A API valida o JWT com `SUPABASE_JWT_SECRET`.
 
 ## Tenant Memberships
 
@@ -206,7 +208,7 @@ A API possui CRUD inicial para memberships de tenant:
 - `POST /v1/tenants/{tenant_id}/memberships`
 - `DELETE /v1/tenants/{tenant_id}/memberships/{membership_id}`
 
-A UI possui `/members` para gerenciar membros. Esses registros serao a base do login humano SaaS quando o provedor de auth for ativado.
+A UI possui `/members` para gerenciar membros. Esses registros definem a empresa e o papel usados pelo login humano SaaS.
 
 ## Workflow Runs
 

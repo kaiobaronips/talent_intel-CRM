@@ -12,12 +12,12 @@ import type { Candidate, Interaction } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const { tenantId, principal } = await resolveActiveTenantId();
+  const { tenantId, principal, authOptions } = await resolveActiveTenantId();
   const [tenantResult, metricsResult, candidatesResult, interactionsResult] = await Promise.all([
-    getTenant(tenantId),
-    getTenantMetrics(tenantId),
-    getCandidates(tenantId, 6),
-    getInteractions(tenantId, 6),
+    getTenant(tenantId, authOptions),
+    getTenantMetrics(tenantId, authOptions),
+    getCandidates(tenantId, 6, authOptions),
+    getInteractions(tenantId, 6, authOptions),
   ]);
 
   const offline = tenantResult.offline || metricsResult.offline || candidatesResult.offline || interactionsResult.offline;
@@ -43,7 +43,7 @@ export default async function DashboardPage() {
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={offline || principal.offline} />
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <TenantCreateForm />
+        {principal.data.is_admin ? <TenantCreateForm /> : null}
         <CandidateCreateForm tenantId={tenantId} />
       </section>
 

@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, s
 from pydantic import BaseModel, Field
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
-from talent_intel_crm.auth import APIPrincipal, api_key_prefix, authorize_tenant, hash_api_key, new_tenant_api_key, require_admin, require_principal
+from talent_intel_crm.auth import APIPrincipal, api_key_prefix, authorize_tenant, hash_api_key, new_tenant_api_key, require_admin, require_principal, require_tenant_admin
 from talent_intel_crm.client import connect_temporal
 from talent_intel_crm.config import TemporalConfig
 from talent_intel_crm.db import (
@@ -149,6 +149,9 @@ async def read_current_principal(principal: APIPrincipal = Depends(require_princ
             "tenant_id": principal.tenant_id,
             "api_key_id": principal.api_key_id,
             "is_admin": principal.is_admin,
+            "user_id": principal.user_id,
+            "email": principal.email,
+            "auth_method": principal.auth_method,
         }
     )
 
@@ -196,7 +199,7 @@ async def read_tenant(tenant_id: str, principal: APIPrincipal = Depends(require_
 
 @app.get("/v1/tenants/{tenant_id}/memberships")
 async def read_tenant_memberships(tenant_id: str, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
-    require_admin(principal)
+    require_tenant_admin(principal, tenant_id)
     if not tenant_exists(tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     return _success({"tenant_id": tenant_id, "items": list_tenant_memberships(tenant_id)})
@@ -208,7 +211,7 @@ async def upsert_membership(
     payload: TenantMembershipUpsertRequest,
     principal: APIPrincipal = Depends(require_principal),
 ) -> Dict[str, Any]:
-    require_admin(principal)
+    require_tenant_admin(principal, tenant_id)
     if not tenant_exists(tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     membership = upsert_tenant_membership(
@@ -228,7 +231,7 @@ async def remove_tenant_membership(
     membership_id: str,
     principal: APIPrincipal = Depends(require_principal),
 ) -> Dict[str, Any]:
-    require_admin(principal)
+    require_tenant_admin(principal, tenant_id)
     membership = delete_tenant_membership(tenant_id, membership_id)
     if not membership:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant membership not found")
@@ -241,7 +244,7 @@ async def create_tenant_api_key(
     payload: TenantAPIKeyCreateRequest,
     principal: APIPrincipal = Depends(require_principal),
 ) -> Dict[str, Any]:
-    require_admin(principal)
+    require_tenant_admin(principal, tenant_id)
     if not tenant_exists(tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     raw_key = new_tenant_api_key()
@@ -258,7 +261,7 @@ async def create_tenant_api_key(
 
 @app.get("/v1/tenants/{tenant_id}/api-keys")
 async def read_tenant_api_keys(tenant_id: str, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
-    require_admin(principal)
+    require_tenant_admin(principal, tenant_id)
     if not tenant_exists(tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     return _success({"tenant_id": tenant_id, "items": list_tenant_api_keys(tenant_id)})
@@ -270,7 +273,7 @@ async def delete_tenant_api_key(
     api_key_id: str,
     principal: APIPrincipal = Depends(require_principal),
 ) -> Dict[str, Any]:
-    require_admin(principal)
+    require_tenant_admin(principal, tenant_id)
     key = revoke_tenant_api_key(tenant_id, api_key_id)
     if not key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active tenant API key not found")
@@ -284,7 +287,7 @@ async def rotate_tenant_api_key(
     payload: TenantAPIKeyCreateRequest,
     principal: APIPrincipal = Depends(require_principal),
 ) -> Dict[str, Any]:
-    require_admin(principal)
+    require_tenant_admin(principal, tenant_id)
     revoked_key = revoke_tenant_api_key(tenant_id, api_key_id)
     if not revoked_key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active tenant API key not found")
