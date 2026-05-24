@@ -1,4 +1,4 @@
-.PHONY: test lint web-typecheck web-lint web-build validate smoke-api prepare-web-env bootstrap-tenant-member
+.PHONY: test lint web-typecheck web-lint web-build validate smoke-api prepare-web-env bootstrap-tenant-member activate-google-provider
 
 test:
 	pytest -q
@@ -25,6 +25,9 @@ prepare-web-env:
 
 bootstrap-tenant-member:
 	python3 scripts/bootstrap_tenant_member.py
+
+activate-google-provider:
+	python3 scripts/activate_supabase_google_provider.py
 
 prod-readiness:
 	python3 scripts/check_production_readiness.py

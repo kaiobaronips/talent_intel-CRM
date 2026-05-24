@@ -68,6 +68,16 @@ No Supabase Auth, habilite o provider Google e cadastre estas URLs de redirecion
 - `http://localhost:3000/auth/callback`
 - `https://<dominio-do-app>/auth/callback`
 
+Para ativar o provider por script:
+
+```bash
+export SUPABASE_PROJECT_REF=<project-ref>
+export SUPABASE_ACCESS_TOKEN=<supabase-management-token>
+export GOOGLE_OAUTH_CLIENT_ID=<google-client-id>
+export GOOGLE_OAUTH_CLIENT_SECRET=<google-client-secret>
+make activate-google-provider
+```
+
 ## 3. Teste controlado
 
 1. Criar ou selecionar tenant controlado.

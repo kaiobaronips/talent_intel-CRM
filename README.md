@@ -180,6 +180,16 @@ Configurar em `web/.env.local`:
 A chave da API e usada apenas server-side pelo Next.js. Em modo SaaS, o login humano grava um cookie httpOnly e a UI chama a API com `Authorization: Bearer`.
 Para login Google, o Supabase Auth deve ter o provider Google ativo e o redirect `/auth/callback` cadastrado.
 
+Ativar Google OAuth via Management API:
+
+```bash
+export SUPABASE_PROJECT_REF=<project-ref>
+export SUPABASE_ACCESS_TOKEN=<supabase-management-token>
+export GOOGLE_OAUTH_CLIENT_ID=<google-client-id>
+export GOOGLE_OAUTH_CLIENT_SECRET=<google-client-secret>
+make activate-google-provider
+```
+
 ## Local Validation Commands
 
 - `make validate`: roda testes Python, Ruff, typecheck/lint/build da UI.
