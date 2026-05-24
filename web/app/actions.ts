@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { apiMutation, getDefaultTenantId } from '@/lib/api';
 import { getSessionToken, sessionCookieName } from '@/lib/session';
+import { authErrorMessage, requireSupabaseAuthConfig, setSessionCookie, type SupabaseTokenPayload } from '@/lib/supabase-auth';
 
 export type ActionState = {
   ok: boolean;
@@ -30,48 +31,35 @@ async function authOptions() {
   return bearerToken ? { bearerToken } : {};
 }
 
-function supabaseAuthConfig() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  return { url, anonKey };
-}
-
 export async function loginAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
   const email = text(formData, 'email');
   const password = text(formData, 'password');
-  const { url, anonKey } = supabaseAuthConfig();
+  const authConfig = requireSupabaseAuthConfig();
 
   if (!email || !password) {
     return { ...initialError, message: 'E-mail e senha são obrigatórios.' };
   }
 
-  if (!url || !anonKey) {
-    return { ok: false, message: 'Supabase Auth não está configurado na UI.' };
+  if (!authConfig.ok) {
+    return { ok: false, message: authConfig.message };
   }
 
-  const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+  const response = await fetch(`${authConfig.config.url}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
-      apikey: anonKey,
+      apikey: authConfig.config.anonKey,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ email, password }),
     cache: 'no-store',
   });
 
-  const payload = (await response.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error_description?: string; msg?: string };
+  const payload = (await response.json().catch(() => ({}))) as SupabaseTokenPayload;
   if (!response.ok || !payload.access_token) {
-    return { ok: false, message: payload.error_description ?? payload.msg ?? 'Login não autorizado.' };
+    return { ok: false, message: authErrorMessage(payload) };
   }
 
-  const cookieStore = await cookies();
-  cookieStore.set(sessionCookieName, payload.access_token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: payload.expires_in ?? 3600,
-  });
+  await setSessionCookie(payload);
 
   redirect('/');
 }

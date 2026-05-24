@@ -171,12 +171,14 @@ npm run dev
 Configurar em `web/.env.local`:
 
 - `NEXT_PUBLIC_TICRM_API_URL=http://localhost:8000`
+- `NEXT_PUBLIC_SITE_URL=http://localhost:3000`
 - `TICRM_API_KEY=<admin-ou-tenant-api-key>` para modo server-to-server/dev
 - `NEXT_PUBLIC_SUPABASE_URL=<supabase-url>` para login humano
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key>` para login humano
 - `NEXT_PUBLIC_DEFAULT_TENANT_ID=api-controlled-003`
 
 A chave da API e usada apenas server-side pelo Next.js. Em modo SaaS, o login humano grava um cookie httpOnly e a UI chama a API com `Authorization: Bearer`.
+Para login Google, o Supabase Auth deve ter o provider Google ativo e o redirect `/auth/callback` cadastrado.
 
 ## Local Validation Commands
 

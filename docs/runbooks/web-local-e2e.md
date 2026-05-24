@@ -35,6 +35,7 @@ Em outro terminal:
 cd /Users/kaiobp/Talent-Intel-CRM/web
 cp .env.local.example .env.local
 # editar TICRM_API_KEY, NEXT_PUBLIC_DEFAULT_TENANT_ID, NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
+# para Google OAuth local, definir tambem NEXT_PUBLIC_SITE_URL=http://localhost:3000
 npm run dev
 ```
 
@@ -61,6 +62,11 @@ Para criar o usuario automaticamente, informe tambem `SUPABASE_SERVICE_ROLE_KEY`
 Acessar:
 
 - `http://localhost:3000/login`
+
+No Supabase Auth, habilite o provider Google e cadastre estas URLs de redirecionamento:
+
+- `http://localhost:3000/auth/callback`
+- `https://<dominio-do-app>/auth/callback`
 
 ## 3. Teste controlado
 

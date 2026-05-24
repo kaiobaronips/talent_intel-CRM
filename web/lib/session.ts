@@ -13,6 +13,7 @@ export type Principal = {
 };
 
 export const sessionCookieName = 'ticrm_session';
+export const oauthVerifierCookieName = 'ticrm_oauth_verifier';
 
 export async function getSessionToken(): Promise<string> {
   const cookieStore = await cookies();
