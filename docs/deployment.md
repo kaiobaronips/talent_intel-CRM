@@ -104,6 +104,25 @@ Inject production variables from the platform secrets manager. Use `deploy/produ
 - Worker activity logs emit structured metric events with `outcome`, duration and relevant tenant/channel/workflow fields.
 - `GET /v1/tenants/{tenant_id}/metrics` returns workflow run outcome counts, interaction counts and pending backlog grouped by channel from Postgres.
 
+## Smoke Checks
+
+Use the smoke helper after deploy or before a release cut:
+
+```bash
+make smoke-api
+```
+
+It verifies:
+
+- `/health`
+- `/ready`
+- tenant read access
+- `metrics`
+- `memberships`
+- `audit-events`
+- `candidates`
+- `interactions`
+
 ## Web Container
 
 A UI Next.js possui imagem separada em `web/Dockerfile`.
@@ -130,3 +149,6 @@ A UI precisa das variaveis:
 - `NEXT_PUBLIC_TICRM_API_URL`
 - `NEXT_PUBLIC_DEFAULT_TENANT_ID`
 - `TICRM_WEB_API_KEY`, repassada como `TICRM_API_KEY` apenas no servidor Next.js
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SITE_URL`

@@ -111,6 +111,8 @@ Rodar smoke da API:
 make smoke-api
 ```
 
+O smoke valida `health`, `ready`, tenant, metrics, memberships, audit events, candidatos e interacoes. Use-o antes de promover a release.
+
 Rodar validacao completa de codigo:
 
 ```bash

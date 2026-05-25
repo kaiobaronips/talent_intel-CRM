@@ -18,6 +18,9 @@ Acesse `http://localhost:3000`.
 - `NEXT_PUBLIC_TICRM_API_URL`: URL publica da API FastAPI. Exemplo: `http://localhost:8000`.
 - `TICRM_API_KEY`: chave server-side usada pelo Next para chamar a API. Nunca use `NEXT_PUBLIC_` nessa chave.
 - `NEXT_PUBLIC_DEFAULT_TENANT_ID`: tenant inicial exibido no dashboard.
+- `NEXT_PUBLIC_SUPABASE_URL`: URL publica do projeto Supabase para login humano.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: anon key publica do Supabase para o fluxo OAuth.
+- `NEXT_PUBLIC_SITE_URL`: base URL publica da UI; usada no callback do OAuth.
 
 ## Telas iniciais
 
@@ -41,6 +44,7 @@ A UI ja possui Server Actions para:
 - rotacionar API key.
 
 As acoes usam `TICRM_API_KEY` no servidor Next.js. Se a API ou Temporal estiverem indisponiveis, o formulario retorna o erro da API sem quebrar a pagina.
+Login humano via Google exige `/auth/callback` cadastrado no Supabase Auth e as URLs publicas acima configuradas na UI.
 
 ## System readiness
 

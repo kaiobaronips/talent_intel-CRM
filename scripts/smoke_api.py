@@ -59,6 +59,12 @@ def main() -> None:
     status, payload = request_json(f"/v1/tenants/{TENANT_ID}/metrics", auth=True)
     assert_ok("metrics", status, payload)
 
+    status, payload = request_json(f"/v1/tenants/{TENANT_ID}/memberships", auth=True)
+    assert_ok("memberships", status, payload)
+
+    status, payload = request_json(f"/v1/tenants/{TENANT_ID}/audit-events?page=1&limit=5", auth=True)
+    assert_ok("audit_events", status, payload)
+
     status, payload = request_json(f"/v1/tenants/{TENANT_ID}/candidates?page=1&limit=5", auth=True)
     assert_ok("candidates", status, payload)
 

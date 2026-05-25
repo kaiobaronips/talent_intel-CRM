@@ -49,6 +49,10 @@
    - solicitacao de criacao de candidate
 2. Teste de API cobre a emissao desses eventos sem tocar no Postgres real.
 
+### Deploy contract
+1. `make smoke-api` agora cobre tambem `memberships` e `audit-events`, alem de health/ready, tenant, metrics, candidates e interactions.
+2. `web/README.md` e `docs/runbooks/web-local-e2e.md` foram alinhados com as variaveis publicas e o smoke de release.
+
 ### Google OAuth ativado no Supabase Auth
 1. Token `SUPABASE_ACCESS_TOKEN` atualizado no `.env` (o anterior era inválido).
    - Novo token armazenado em `.env` (não versionar).
