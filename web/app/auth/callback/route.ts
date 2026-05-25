@@ -11,10 +11,6 @@ function buildSetCookie(name: string, value: string, maxAge: number, secure: boo
   return parts.join('; ');
 }
 
-function clearCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`;
-}
-
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
@@ -39,28 +35,47 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login?error=missing_verifier', request.url));
   }
 
-  const tokenResponse = await fetch(`${authConfig.config.url}/auth/v1/token?grant_type=pkce`, {
-    method: 'POST',
-    headers: {
-      apikey: authConfig.config.anonKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
-    cache: 'no-store',
-  });
+  let tokenResponse: globalThis.Response;
+  try {
+    tokenResponse = await fetch(`${authConfig.config.url}/auth/v1/token?grant_type=pkce`, {
+      method: 'POST',
+      headers: {
+        apikey: authConfig.config.anonKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
+      cache: 'no-store',
+    });
+  } catch (err) {
+    console.error('[auth/callback] token exchange fetch failed:', err);
+    return NextResponse.redirect(new URL('/login?error=token_exchange_failed', request.url));
+  }
 
   const payload = (await tokenResponse.json().catch(() => ({}))) as SupabaseTokenPayload;
   if (!tokenResponse.ok || !payload.access_token) {
     const message = authErrorMessage(payload, 'oauth_failed');
+    console.error('[auth/callback] token exchange rejected:', tokenResponse.status, message);
     return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, request.url));
   }
 
   const secure = process.env.NODE_ENV === 'production';
-  const headers = new Headers({ Location: new URL('/', request.url).toString() });
-  headers.append('Set-Cookie', buildSetCookie(sessionCookieName, String(payload.access_token), Number(payload.expires_in) || 3600, secure));
+  const accessToken = String(payload.access_token);
+  const expiresIn = Number(payload.expires_in) || 3600;
+  const redirectUrl = new URL('/', request.url).toString();
+
+  const setCookies: [string, string][] = [
+    ['Set-Cookie', buildSetCookie(sessionCookieName, accessToken, expiresIn, secure)],
+  ];
   if (payload.refresh_token) {
-    headers.append('Set-Cookie', buildSetCookie(refreshCookieName, String(payload.refresh_token), 60 * 60 * 24 * 30, secure));
+    setCookies.push(['Set-Cookie', buildSetCookie(refreshCookieName, String(payload.refresh_token), 60 * 60 * 24 * 30, secure)]);
   }
-  headers.append('Set-Cookie', clearCookie(oauthVerifierCookieName));
-  return new Response(null, { status: 307, headers });
+  setCookies.push(['Set-Cookie', `${oauthVerifierCookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`]);
+
+  return new Response(null, {
+    status: 307,
+    headers: [
+      ['Location', redirectUrl],
+      ...setCookies,
+    ],
+  });
 }
