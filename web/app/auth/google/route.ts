@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { oauthVerifierCookieName } from '@/lib/session';
 import { requireSupabaseAuthConfig } from '@/lib/supabase-auth';
 
@@ -12,7 +13,7 @@ function base64Url(buffer: Buffer): string {
 export async function GET(request: Request) {
   const authConfig = requireSupabaseAuthConfig();
   if (!authConfig.ok) {
-    return NextResponse.redirect(new URL('/login?error=auth_config', request.url));
+    redirect('/login?error=auth_config');
   }
 
   const verifier = base64Url(crypto.randomBytes(64));
@@ -25,17 +26,14 @@ export async function GET(request: Request) {
   supabaseUrl.searchParams.set('code_challenge', challenge);
   supabaseUrl.searchParams.set('code_challenge_method', 's256');
 
-  const secure = process.env.NODE_ENV === 'production';
-  const cookieParts = [
-    `${oauthVerifierCookieName}=${verifier}`,
-    'Path=/',
-    'Max-Age=600',
-    'HttpOnly',
-    'SameSite=Lax',
-  ];
-  if (secure) cookieParts.push('Secure');
+  const cookieStore = await cookies();
+  cookieStore.set(oauthVerifierCookieName, verifier, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 600,
+  });
 
-  const response = NextResponse.redirect(supabaseUrl);
-  response.headers.append('set-cookie', cookieParts.join('; '));
-  return response;
+  redirect(supabaseUrl.toString());
 }
