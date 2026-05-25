@@ -1,0 +1,8 @@
+project_id = "hkqdndpxpmkedauqewzk"
+
+[auth]
+site_url = "https://talent-intel-crm-kaiopirolo-2330s-projects.vercel.app"
+additional_redirect_urls = [
+  "http://localhost:3000/auth/callback",
+  "https://talent-intel-crm-kaiopirolo-2330s-projects.vercel.app/auth/callback",
+]
