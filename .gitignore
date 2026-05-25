@@ -13,3 +13,4 @@ out/
 .turbo/
 *.tsbuildinfo
 .env.local
+.vercel
