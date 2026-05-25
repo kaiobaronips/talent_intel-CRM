@@ -28,4 +28,5 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [project.scripts]
+app = "talent_intel_crm.api:app"
 ticrm-migrate = "talent_intel_crm.migrations:main"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from typing import Any, Iterator
@@ -9,6 +10,9 @@ import psycopg
 from psycopg.rows import dict_row
 
 from talent_intel_crm.support import env
+
+
+logger = logging.getLogger("talent_intel_crm.db")
 
 
 def database_url() -> str:
@@ -37,7 +41,8 @@ def database_ready() -> bool:
             with connection.cursor() as cur:
                 cur.execute("select 1 as ready")
                 return bool(cur.fetchone())
-    except Exception:
+    except Exception as exc:
+        logger.warning("database_ready_failed: %s: %s", type(exc).__name__, exc)
         return False
 
 

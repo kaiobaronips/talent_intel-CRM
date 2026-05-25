@@ -14,3 +14,4 @@ out/
 *.tsbuildinfo
 .env.local
 .vercel
+supabase/.temp/
