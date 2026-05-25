@@ -35,11 +35,7 @@ export async function GET(request: Request) {
   ];
   if (secure) cookieParts.push('Secure');
 
-  return new Response(null, {
-    status: 307,
-    headers: [
-      ['Location', supabaseUrl.toString()],
-      ['Set-Cookie', cookieParts.join('; ')],
-    ],
-  });
+  const response = NextResponse.redirect(supabaseUrl);
+  response.headers.append('set-cookie', cookieParts.join('; '));
+  return response;
 }
