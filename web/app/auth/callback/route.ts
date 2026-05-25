@@ -1,9 +1,19 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { oauthVerifierCookieName, refreshCookieName, sessionCookieName } from '@/lib/session';
-import { authCookieOptions, authErrorMessage, requireSupabaseAuthConfig, type SupabaseTokenPayload } from '@/lib/supabase-auth';
+import { authErrorMessage, requireSupabaseAuthConfig, type SupabaseTokenPayload } from '@/lib/supabase-auth';
 
 export const dynamic = 'force-dynamic';
+
+function buildSetCookie(name: string, value: string, maxAge: number, secure: boolean): string {
+  const parts = [`${name}=${value}`, 'Path=/', `Max-Age=${maxAge}`, 'HttpOnly', 'SameSite=Lax'];
+  if (secure) parts.push('Secure');
+  return parts.join('; ');
+}
+
+function clearCookie(name: string): string {
+  return `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`;
+}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -29,7 +39,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login?error=missing_verifier', request.url));
   }
 
-  const response = await fetch(`${authConfig.config.url}/auth/v1/token?grant_type=pkce`, {
+  const tokenResponse = await fetch(`${authConfig.config.url}/auth/v1/token?grant_type=pkce`, {
     method: 'POST',
     headers: {
       apikey: authConfig.config.anonKey,
@@ -39,17 +49,18 @@ export async function GET(request: Request) {
     cache: 'no-store',
   });
 
-  const payload = (await response.json().catch(() => ({}))) as SupabaseTokenPayload;
-  if (!response.ok || !payload.access_token) {
+  const payload = (await tokenResponse.json().catch(() => ({}))) as SupabaseTokenPayload;
+  if (!tokenResponse.ok || !payload.access_token) {
     const message = authErrorMessage(payload, 'oauth_failed');
     return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, request.url));
   }
 
-  const redirectResponse = NextResponse.redirect(new URL('/', request.url));
-  redirectResponse.cookies.set(sessionCookieName, payload.access_token, authCookieOptions(payload.expires_in ?? 3600));
+  const secure = process.env.NODE_ENV === 'production';
+  const headers = new Headers({ Location: new URL('/', request.url).toString() });
+  headers.append('Set-Cookie', buildSetCookie(sessionCookieName, String(payload.access_token), Number(payload.expires_in) || 3600, secure));
   if (payload.refresh_token) {
-    redirectResponse.cookies.set(refreshCookieName, payload.refresh_token, authCookieOptions(60 * 60 * 24 * 30));
+    headers.append('Set-Cookie', buildSetCookie(refreshCookieName, String(payload.refresh_token), 60 * 60 * 24 * 30, secure));
   }
-  redirectResponse.cookies.delete(oauthVerifierCookieName);
-  return redirectResponse;
+  headers.append('Set-Cookie', clearCookie(oauthVerifierCookieName));
+  return new Response(null, { status: 307, headers });
 }
