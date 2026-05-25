@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   response.cookies.set(oauthVerifierCookieName, verifier, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: 600,
   });

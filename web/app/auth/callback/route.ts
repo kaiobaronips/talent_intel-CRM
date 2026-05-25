@@ -6,7 +6,12 @@ import { authErrorMessage, requireSupabaseAuthConfig, type SupabaseTokenPayload 
 export const dynamic = 'force-dynamic';
 
 function buildSetCookie(name: string, value: string, maxAge: number): string {
-  return [`${name}=${value}`, 'Path=/', `Max-Age=${maxAge}`, 'HttpOnly', 'SameSite=Lax', 'Secure'].join('; ');
+  const secure = process.env.NODE_ENV === 'production';
+  const parts = [`${name}=${value}`, 'Path=/', `Max-Age=${maxAge}`, 'HttpOnly', 'SameSite=Lax'];
+  if (secure) {
+    parts.push('Secure');
+  }
+  return parts.join('; ');
 }
 
 export async function GET(request: Request) {

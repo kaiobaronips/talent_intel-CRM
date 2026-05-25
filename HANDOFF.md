@@ -1,4 +1,4 @@
-# Handoff — Talent Intel CRM — 2026-05-24
+# Handoff — Talent Intel CRM — 2026-05-25
 
 ## Projeto
 
@@ -64,12 +64,13 @@
    - Client Secret configurado no Supabase.
 3. Redirect URLs configuradas no Supabase Auth:
    - `http://localhost:3000/auth/callback`
-   - `https://tallent-intelligence-crm-dashboard.vercel.app/auth/callback`
+   - `https://talent-intel-crm-kaiopirolo-2330s-projects.vercel.app/auth/callback`
 4. Criado `web/.env.local` (gitignored) com:
    - `NEXT_PUBLIC_SUPABASE_URL=https://hkqdndpxpmkedauqewzk.supabase.co`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key do projeto>`
    - `NEXT_PUBLIC_SITE_URL=http://localhost:3003`
 5. Testado via Playwright: botão "Entrar com Google" redireciona corretamente para `accounts.google.com` com parâmetros OAuth corretos.
+6. Adicionado `supabase/config.toml` como fonte de verdade local para `site_url` e `additional_redirect_urls` do Auth.
 
 ### Validações aprovadas
 - `npm run typecheck` — OK
@@ -82,7 +83,7 @@
 
 ### P1 — Externo/deploy
 1. **Vercel env**: Confirmar no dashboard Vercel `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_TICRM_API_URL` e variaveis server-side da UI/API.
-2. **Dominio custom**: Se o app tiver dominio proprio (ex: `app.soreninvestimentos.com.br`), adicionar `https://<dominio>/auth/callback` tanto no Supabase Auth quanto no Google Console.
+2. **Google Console**: confirmar que o redirect do Supabase continua cadastrado em `https://hkqdndpxpmkedauqewzk.supabase.co/auth/v1/callback`.
 3. **Smoke em producao**: apos deploy, testar login Google, `/members` por e-mail, logout e refresh apos expiracao/401.
 
 ## Arquivos relevantes
