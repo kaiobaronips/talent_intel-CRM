@@ -35,19 +35,23 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login?error=missing_verifier', request.url));
   }
 
+  const tokenUrl = `${authConfig.config.url}/auth/v1/token?grant_type=pkce`;
+  const anonKey = authConfig.config.anonKey;
+  console.log('[auth/callback] tokenUrl:', tokenUrl, 'anonKey length:', anonKey.length, 'anonKey first/last:', anonKey.slice(0, 10) + '...' + anonKey.slice(-10));
+
   let tokenResponse: globalThis.Response;
   try {
-    tokenResponse = await fetch(`${authConfig.config.url}/auth/v1/token?grant_type=pkce`, {
+    tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
-      headers: {
-        apikey: authConfig.config.anonKey,
-        'Content-Type': 'application/json',
-      },
+      headers: new Headers([
+        ['apikey', anonKey],
+        ['Content-Type', 'application/json'],
+      ]),
       body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
       cache: 'no-store',
     });
   } catch (err) {
-    console.error('[auth/callback] token exchange fetch failed:', err);
+    console.error('[auth/callback] token exchange fetch failed:', String(err));
     return NextResponse.redirect(new URL('/login?error=token_exchange_failed', request.url));
   }
 
