@@ -51,8 +51,9 @@ export async function GET(request: Request) {
       cache: 'no-store',
     });
   } catch (err) {
-    console.error('[auth/callback] token exchange fetch failed:', String(err));
-    return NextResponse.redirect(new URL('/login?error=token_exchange_failed', request.url));
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error('[auth/callback] fetch failed:', detail);
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('fetch_failed: ' + detail)}&url=${encodeURIComponent(tokenUrl)}&keylen=${anonKey.length}`, request.url));
   }
 
   const payload = (await tokenResponse.json().catch(() => ({}))) as SupabaseTokenPayload;
