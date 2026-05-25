@@ -12,9 +12,9 @@ export type SupabaseTokenPayload = {
 
 export function supabaseAuthConfig() {
   return {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '') ?? '',
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-    siteUrl: process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? '',
+    url: (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim().replace(/\/$/, ''),
+    anonKey: (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim(),
+    siteUrl: (process.env.NEXT_PUBLIC_SITE_URL ?? '').trim().replace(/\/$/, ''),
   };
 }
 
