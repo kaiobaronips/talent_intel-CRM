@@ -30,9 +30,11 @@ export async function GET(request: Request) {
   }
 
   const cookieStore = await cookies();
+  const allCookies = cookieStore.getAll().map(c => c.name).join(',');
   const codeVerifier = cookieStore.get(oauthVerifierCookieName)?.value ?? '';
   if (!codeVerifier) {
-    return NextResponse.redirect(new URL('/login?error=missing_verifier', request.url));
+    const rawCookie = request.headers.get('cookie') ?? 'none';
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('missing_verifier cookies=[' + allCookies + '] raw=[' + rawCookie.slice(0, 200) + ']')}`, request.url));
   }
 
   const tokenUrl = `${authConfig.config.url}/auth/v1/token?grant_type=pkce`;
