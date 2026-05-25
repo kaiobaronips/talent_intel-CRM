@@ -5,10 +5,8 @@ import { authErrorMessage, requireSupabaseAuthConfig, type SupabaseTokenPayload 
 
 export const dynamic = 'force-dynamic';
 
-function buildSetCookie(name: string, value: string, maxAge: number, secure: boolean): string {
-  const parts = [`${name}=${value}`, 'Path=/', `Max-Age=${maxAge}`, 'HttpOnly', 'SameSite=Lax'];
-  if (secure) parts.push('Secure');
-  return parts.join('; ');
+function buildSetCookie(name: string, value: string, maxAge: number): string {
+  return [`${name}=${value}`, 'Path=/', `Max-Age=${maxAge}`, 'HttpOnly', 'SameSite=Lax', 'Secure'].join('; ');
 }
 
 export async function GET(request: Request) {
@@ -30,58 +28,45 @@ export async function GET(request: Request) {
   }
 
   const cookieStore = await cookies();
-  const allCookies = cookieStore.getAll().map(c => c.name).join(',');
   const codeVerifier = cookieStore.get(oauthVerifierCookieName)?.value ?? '';
   if (!codeVerifier) {
-    const rawCookie = request.headers.get('cookie') ?? 'none';
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('missing_verifier cookies=[' + allCookies + '] raw=[' + rawCookie.slice(0, 200) + ']')}`, request.url));
+    return NextResponse.redirect(new URL('/login?error=missing_verifier', request.url));
   }
-
-  const tokenUrl = `${authConfig.config.url}/auth/v1/token?grant_type=pkce`;
-  const anonKey = authConfig.config.anonKey;
-  console.log('[auth/callback] tokenUrl:', tokenUrl, 'anonKey length:', anonKey.length, 'anonKey first/last:', anonKey.slice(0, 10) + '...' + anonKey.slice(-10));
 
   let tokenResponse: globalThis.Response;
   try {
-    tokenResponse = await fetch(tokenUrl, {
+    tokenResponse = await fetch(`${authConfig.config.url}/auth/v1/token?grant_type=pkce`, {
       method: 'POST',
-      headers: new Headers([
-        ['apikey', anonKey],
-        ['Content-Type', 'application/json'],
-      ]),
+      headers: { apikey: authConfig.config.anonKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
       cache: 'no-store',
     });
   } catch (err) {
-    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    console.error('[auth/callback] fetch failed:', detail);
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('fetch_failed: ' + detail)}&url=${encodeURIComponent(tokenUrl)}&keylen=${anonKey.length}`, request.url));
+    const detail = err instanceof Error ? err.message : String(err);
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('fetch_failed: ' + detail)}`, request.url));
   }
 
   const payload = (await tokenResponse.json().catch(() => ({}))) as SupabaseTokenPayload;
   if (!tokenResponse.ok || !payload.access_token) {
     const message = authErrorMessage(payload, 'oauth_failed');
-    console.error('[auth/callback] token exchange rejected:', tokenResponse.status, message);
     return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, request.url));
   }
 
-  const secure = process.env.NODE_ENV === 'production';
   const accessToken = String(payload.access_token);
   const expiresIn = Number(payload.expires_in) || 3600;
-  const redirectUrl = new URL('/', request.url).toString();
 
   const setCookies: [string, string][] = [
-    ['Set-Cookie', buildSetCookie(sessionCookieName, accessToken, expiresIn, secure)],
+    ['Set-Cookie', buildSetCookie(sessionCookieName, accessToken, expiresIn)],
   ];
   if (payload.refresh_token) {
-    setCookies.push(['Set-Cookie', buildSetCookie(refreshCookieName, String(payload.refresh_token), 60 * 60 * 24 * 30, secure)]);
+    setCookies.push(['Set-Cookie', buildSetCookie(refreshCookieName, String(payload.refresh_token), 60 * 60 * 24 * 30)]);
   }
   setCookies.push(['Set-Cookie', `${oauthVerifierCookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`]);
 
   return new Response(null, {
     status: 307,
     headers: [
-      ['Location', redirectUrl],
+      ['Location', new URL('/', request.url).toString()],
       ...setCookies,
     ],
   });

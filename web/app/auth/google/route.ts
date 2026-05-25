@@ -1,6 +1,5 @@
 import crypto from 'node:crypto';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { NextResponse } from 'next/server';
 import { oauthVerifierCookieName } from '@/lib/session';
 import { requireSupabaseAuthConfig } from '@/lib/supabase-auth';
 
@@ -13,7 +12,7 @@ function base64Url(buffer: Buffer): string {
 export async function GET(request: Request) {
   const authConfig = requireSupabaseAuthConfig();
   if (!authConfig.ok) {
-    redirect('/login?error=auth_config');
+    return NextResponse.redirect(new URL('/login?error=auth_config', request.url));
   }
 
   const verifier = base64Url(crypto.randomBytes(64));
@@ -26,14 +25,13 @@ export async function GET(request: Request) {
   supabaseUrl.searchParams.set('code_challenge', challenge);
   supabaseUrl.searchParams.set('code_challenge_method', 's256');
 
-  const cookieStore = await cookies();
-  cookieStore.set(oauthVerifierCookieName, verifier, {
+  const response = NextResponse.redirect(supabaseUrl);
+  response.cookies.set(oauthVerifierCookieName, verifier, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
     path: '/',
     maxAge: 600,
   });
-
-  redirect(supabaseUrl.toString());
+  return response;
 }
