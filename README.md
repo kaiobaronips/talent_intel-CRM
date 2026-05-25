@@ -231,6 +231,8 @@ A API possui CRUD inicial para memberships de tenant:
 
 A UI possui `/members` para gerenciar membros. O formulario aceita e-mail como caminho principal: a API resolve o usuario em `auth.users` e grava `tenant_memberships`. A remocao pode ser feita diretamente pela linha do membro cadastrado. Esses registros definem a empresa e o papel usados pelo login humano SaaS.
 
+As mutacoes operacionais relevantes geram audit events em `audit_events`, incluindo criacao/remoção de memberships, criacao/revogacao/rotacao de chaves de API e solicitacao de onboarding/candidato.
+
 ## Workflow Runs
 
 A API expoe `GET /v1/tenants/{tenant_id}/workflow-runs` e a UI possui `/workflows` para observar execucoes Temporal por tenant.

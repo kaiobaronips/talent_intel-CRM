@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from fastapi.testclient import TestClient
@@ -26,6 +27,12 @@ def admin_principal_override():
     api.app.dependency_overrides[api.require_principal] = lambda: APIPrincipal(role="admin")
     yield
     api.app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def audit_event_stub(monkeypatch):
+    monkeypatch.setattr(api, "append_audit_event", lambda payload: {"id": "audit-stub", **payload})
+    yield
 
 
 def test_read_current_principal() -> None:
@@ -245,6 +252,53 @@ def test_tenant_key_lifecycle_routes(monkeypatch) -> None:
     assert revoked.json()["data"]["key"]["is_active"] is False
     assert rotated.status_code == 201
     assert rotated.json()["data"]["api_key"] == "ticrm_rotated-key"
+
+
+def test_mutating_routes_append_audit_events(monkeypatch) -> None:
+    events: list[dict[str, object]] = []
+
+    def capture_audit(payload: dict[str, object]) -> dict[str, object]:
+        events.append(payload)
+        return {"id": f"audit-{len(events)}", **payload}
+
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "append_audit_event", capture_audit)
+    monkeypatch.setattr(api, "find_auth_user_by_email", lambda email: {"id": "user-from-email", "email": email})
+    monkeypatch.setattr(api, "upsert_tenant_membership", lambda payload: {"id": "member-001", **payload})
+    monkeypatch.setattr(api, "new_tenant_api_key", lambda: "ticrm_new-key")
+    monkeypatch.setattr(api, "insert_tenant_api_key", lambda payload: {"id": "key-002", "key_prefix": payload["key_prefix"], "label": payload["label"]})
+    monkeypatch.setattr(api, "revoke_tenant_api_key", lambda _tenant_id, key_id: {"id": key_id, "key_prefix": "ticrm_old", "label": "old", "is_active": False})
+
+    async def connect():
+        return FakeTemporalClient()
+
+    monkeypatch.setattr(api, "connect_temporal", connect)
+    client = TestClient(api.app)
+
+    membership = client.post(
+        "/v1/tenants/tenant-001/memberships",
+        json={"email": "user@example.com", "role": "recruiter"},
+    )
+    key = client.post("/v1/tenants/tenant-001/api-keys", json={"label": "primary"})
+    candidate = client.post(
+        "/v1/candidates",
+        json={
+            "tenant_id": "tenant-001",
+            "name": "Candidate One",
+            "email": "candidate@example.com",
+            "linkedin_url": "https://linkedin.com/in/candidate-one",
+        },
+    )
+
+    assert membership.status_code == 201
+    assert key.status_code == 201
+    assert candidate.status_code == 202
+    assert [event["event_type"] for event in events] == [
+        "tenant_membership.upserted",
+        "tenant_api_key.created",
+        "candidate.create_requested",
+    ]
+    assert all("access_token" not in json.dumps(event) and "refresh_token" not in json.dumps(event) for event in events)
 
 
 def test_tenant_pagination_and_metrics_routes(monkeypatch) -> None:

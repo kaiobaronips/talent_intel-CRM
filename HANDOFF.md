@@ -41,6 +41,14 @@
    - Cada linha de membro cadastrado agora possui acao direta "Remover".
    - Reduz dependencia de copiar manualmente o ID da associacao.
 
+### Auditoria operacional
+1. Passou a haver audit event para mutacoes SaaS centrais:
+   - onboarding de tenant
+   - criacao/remoção de membership
+   - criacao/revogacao/rotacao de API key
+   - solicitacao de criacao de candidate
+2. Teste de API cobre a emissao desses eventos sem tocar no Postgres real.
+
 ### Google OAuth ativado no Supabase Auth
 1. Token `SUPABASE_ACCESS_TOKEN` atualizado no `.env` (o anterior era inválido).
    - Novo token armazenado em `.env` (não versionar).

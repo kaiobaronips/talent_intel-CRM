@@ -14,6 +14,7 @@ from talent_intel_crm.client import connect_temporal
 from talent_intel_crm.config import TemporalConfig
 from talent_intel_crm.db import (
     database_ready,
+    append_audit_event,
     delete_tenant_membership,
     find_auth_user_by_email,
     get_candidate,
@@ -120,6 +121,26 @@ def _candidate_channels(payload: CandidateCreateRequest) -> List[str]:
     return channels
 
 
+def _record_audit_event(
+    *,
+    tenant_id: str,
+    event_type: str,
+    principal: APIPrincipal,
+    payload: Dict[str, Any],
+    candidate_id: Optional[str] = None,
+) -> None:
+    append_audit_event(
+        {
+            "tenant_id": tenant_id,
+            "candidate_id": candidate_id,
+            "event_type": event_type,
+            "actor_type": principal.auth_method or principal.role or "system",
+            "actor_id": principal.user_id or principal.api_key_id or principal.tenant_id or principal.role,
+            "payload": payload,
+        }
+    )
+
+
 @app.get("/health")
 async def health() -> Dict[str, Any]:
     temporal = TemporalConfig()
@@ -186,6 +207,20 @@ async def create_tenant(payload: TenantCreateRequest, principal: APIPrincipal = 
         )
     except WorkflowAlreadyStartedError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Tenant onboarding already started") from exc
+    _record_audit_event(
+        tenant_id=payload.tenant_id,
+        event_type="tenant.create_requested",
+        principal=principal,
+        payload={
+            "tenant_id": payload.tenant_id,
+            "company_name": payload.company_name,
+            "tier": payload.tier.value,
+            "primary_domain": payload.primary_domain,
+            "timezone": payload.timezone,
+            "workflow_id": handle.id,
+            "run_id": handle.result_run_id,
+        },
+    )
     return _success({"workflow_id": handle.id, "run_id": handle.result_run_id, "tenant_id": payload.tenant_id})
 
 
@@ -233,6 +268,17 @@ async def upsert_membership(
             "role": payload.role,
         }
     )
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="tenant_membership.upserted",
+        principal=principal,
+        payload={
+            "membership_id": membership.get("id"),
+            "user_id": membership.get("user_id", user_id),
+            "email": membership.get("email", email),
+            "role": membership.get("role", payload.role),
+        },
+    )
     return _success({"tenant_id": tenant_id, "membership": membership})
 
 
@@ -246,6 +292,17 @@ async def remove_tenant_membership(
     membership = delete_tenant_membership(tenant_id, membership_id)
     if not membership:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant membership not found")
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="tenant_membership.deleted",
+        principal=principal,
+        payload={
+            "membership_id": membership.get("id"),
+            "user_id": membership.get("user_id", ""),
+            "email": membership.get("email", ""),
+            "role": membership.get("role", ""),
+        },
+    )
     return _success({"tenant_id": tenant_id, "membership": membership})
 
 
@@ -266,6 +323,16 @@ async def create_tenant_api_key(
             "key_hash": hash_api_key(raw_key),
             "label": payload.label,
         }
+    )
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="tenant_api_key.created",
+        principal=principal,
+        payload={
+            "key_id": record.get("id"),
+            "label": payload.label,
+            "key_prefix": record.get("key_prefix"),
+        },
     )
     return _success({"api_key": raw_key, "key": record})
 
@@ -288,6 +355,16 @@ async def delete_tenant_api_key(
     key = revoke_tenant_api_key(tenant_id, api_key_id)
     if not key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active tenant API key not found")
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="tenant_api_key.revoked",
+        principal=principal,
+        payload={
+            "key_id": key.get("id"),
+            "key_prefix": key.get("key_prefix"),
+            "label": key.get("label"),
+        },
+    )
     return _success({"tenant_id": tenant_id, "key": key})
 
 
@@ -310,6 +387,16 @@ async def rotate_tenant_api_key(
             "key_hash": hash_api_key(raw_key),
             "label": payload.label,
         }
+    )
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="tenant_api_key.rotated",
+        principal=principal,
+        payload={
+            "revoked_key_id": revoked_key.get("id"),
+            "created_key_id": created_key.get("id"),
+            "label": payload.label,
+        },
     )
     return _success({"api_key": raw_key, "revoked_key": revoked_key, "key": created_key})
 
@@ -344,6 +431,22 @@ async def create_candidate(payload: CandidateCreateRequest, principal: APIPrinci
         )
     except WorkflowAlreadyStartedError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Candidate lifecycle already started") from exc
+    _record_audit_event(
+        tenant_id=payload.tenant_id,
+        event_type="candidate.create_requested",
+        principal=principal,
+        candidate_id=candidate_id,
+        payload={
+            "candidate_id": candidate_id,
+            "name": payload.name,
+            "city": payload.city,
+            "email": payload.email,
+            "linkedin_url": payload.linkedin_url,
+            "channels": channels,
+            "workflow_id": handle.id,
+            "run_id": handle.result_run_id,
+        },
+    )
     return _success(
         {
             "workflow_id": handle.id,
