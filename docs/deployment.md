@@ -152,3 +152,5 @@ A UI precisa das variaveis:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_SITE_URL`
+
+Para login humano funcionar em producao, o service `web` precisa receber as variaveis publicas do Supabase e a URL publica do app no mesmo ambiente do container, nao apenas via env local de desenvolvimento.

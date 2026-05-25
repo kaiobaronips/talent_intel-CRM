@@ -52,6 +52,8 @@
 ### Deploy contract
 1. `make smoke-api` agora cobre tambem `memberships` e `audit-events`, alem de health/ready, tenant, metrics, candidates e interactions.
 2. `web/README.md` e `docs/runbooks/web-local-e2e.md` foram alinhados com as variaveis publicas e o smoke de release.
+3. O `web` em `deploy/compose.production.yml` passou a receber `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `NEXT_PUBLIC_SITE_URL`, que sao obrigatorios para login humano em producao.
+4. `docker compose --env-file deploy/production.env.example -f deploy/compose.production.yml config` valida o contrato do deploy sem depender da shell local.
 
 ### Google OAuth ativado no Supabase Auth
 1. Token `SUPABASE_ACCESS_TOKEN` atualizado no `.env` (o anterior era inválido).
