@@ -25,13 +25,21 @@ export async function GET(request: Request) {
   supabaseUrl.searchParams.set('code_challenge', challenge);
   supabaseUrl.searchParams.set('code_challenge_method', 's256');
 
-  const response = NextResponse.redirect(supabaseUrl);
-  response.cookies.set(oauthVerifierCookieName, verifier, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 600,
+  const secure = process.env.NODE_ENV === 'production';
+  const cookieParts = [
+    `${oauthVerifierCookieName}=${verifier}`,
+    'Path=/',
+    'Max-Age=600',
+    'HttpOnly',
+    'SameSite=Lax',
+  ];
+  if (secure) cookieParts.push('Secure');
+
+  return new Response(null, {
+    status: 307,
+    headers: [
+      ['Location', supabaseUrl.toString()],
+      ['Set-Cookie', cookieParts.join('; ')],
+    ],
   });
-  return response;
 }
