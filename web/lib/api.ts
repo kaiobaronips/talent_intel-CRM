@@ -30,6 +30,7 @@ type MembershipsPayload = {
 
 type ApiAuthOptions = {
   bearerToken?: string;
+  apiKeyFallback?: boolean;
 };
 
 function authHeaders(options: ApiAuthOptions = {}): Record<string, string> {
@@ -37,7 +38,7 @@ function authHeaders(options: ApiAuthOptions = {}): Record<string, string> {
 
   if (options.bearerToken) {
     headers.Authorization = `Bearer ${options.bearerToken}`;
-  } else if (apiKey) {
+  } else if (apiKey && options.apiKeyFallback !== false) {
     headers['X-API-Key'] = apiKey;
   }
 

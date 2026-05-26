@@ -17,7 +17,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
   const { tenantId } = await params;
   await requireAuthenticatedPrincipal();
   const token = await getSessionToken();
-  const authOptions = token ? { bearerToken: token } : {};
+  const authOptions = token ? { bearerToken: token, apiKeyFallback: false } : { apiKeyFallback: false };
   const [tenantResult, metricsResult, candidatesResult, interactionsResult, keysResult] = await Promise.all([
     getTenant(tenantId, authOptions),
     getTenantMetrics(tenantId, authOptions),

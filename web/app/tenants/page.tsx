@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export default async function TenantsPage() {
   await requireAuthenticatedPrincipal();
   const token = await getSessionToken();
-  const tenantsResult = await getTenants(50, token ? { bearerToken: token } : {});
+  const tenantsResult = await getTenants(50, token ? { bearerToken: token, apiKeyFallback: false } : { apiKeyFallback: false });
   const tenants = tenantsResult.data.items;
   const scale = tenants.filter((tenant) => tenant.tier === 'scale').length;
   const growth = tenants.filter((tenant) => tenant.tier === 'growth').length;

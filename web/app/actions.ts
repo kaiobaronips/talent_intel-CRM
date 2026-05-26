@@ -28,7 +28,7 @@ function revalidateTenantViews(tenantId: string) {
 
 async function authOptions() {
   const bearerToken = await getSessionToken();
-  return bearerToken ? { bearerToken } : {};
+  return bearerToken ? { bearerToken, apiKeyFallback: false } : { apiKeyFallback: false };
 }
 
 export async function loginAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {

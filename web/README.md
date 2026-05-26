@@ -16,7 +16,7 @@ Acesse `http://localhost:3000`.
 ## Variaveis
 
 - `NEXT_PUBLIC_TICRM_API_URL`: URL publica da API FastAPI. Exemplo: `http://localhost:8000`.
-- `TICRM_API_KEY`: chave server-side usada pelo Next para chamar a API. Nunca use `NEXT_PUBLIC_` nessa chave.
+- `TICRM_API_KEY`: chave server-side para smoke/admin interno. Páginas autenticadas usam o Bearer token Supabase do usuário, não essa chave como fallback.
 - `NEXT_PUBLIC_DEFAULT_TENANT_ID`: tenant inicial exibido no dashboard.
 - `NEXT_PUBLIC_SUPABASE_URL`: URL publica do projeto Supabase para login humano.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: anon key publica do Supabase para o fluxo OAuth.
@@ -31,7 +31,7 @@ Acesse `http://localhost:3000`.
 
 ## Regra de seguranca
 
-O app chama a API a partir de Server Components. A chave `TICRM_API_KEY` fica apenas no processo Next.js e nao e enviada ao browser.
+O app chama a API a partir de Server Components. A chave `TICRM_API_KEY` fica apenas no processo Next.js e nao e enviada ao browser. Fluxos humanos autenticados devem usar o Bearer token Supabase e autorização por `tenant_memberships`.
 
 ## Acoes operacionais
 
@@ -43,7 +43,7 @@ A UI ja possui Server Actions para:
 - revogar API key;
 - rotacionar API key.
 
-As acoes usam `TICRM_API_KEY` no servidor Next.js. Se a API ou Temporal estiverem indisponiveis, o formulario retorna o erro da API sem quebrar a pagina.
+As acoes autenticadas usam o Bearer token Supabase do usuário logado. Se a API, Temporal ou a autorização por tenant falhar, o formulario retorna o erro da API sem quebrar a pagina.
 Login humano via Google exige `/auth/callback` cadastrado no Supabase Auth e as URLs publicas acima configuradas na UI.
 
 ## System readiness

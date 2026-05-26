@@ -24,22 +24,22 @@ export async function getSessionToken(): Promise<string> {
 export async function getPrincipal() {
   const bearerToken = await getSessionToken();
   return apiGetRaw<Principal>('/v1/me', {
-    role: 'admin',
+    role: '',
     tenant_id: '',
     api_key_id: '',
-    is_admin: true,
+    is_admin: false,
     auth_method: 'fallback',
-  }, bearerToken ? { bearerToken } : {});
+  }, bearerToken ? { bearerToken, apiKeyFallback: false } : { apiKeyFallback: false });
 }
 
 export async function requireAuthenticatedPrincipal() {
   const token = await getSessionToken();
-  if (!token && !process.env.TICRM_API_KEY) {
+  if (!token) {
     redirect('/login');
   }
 
   const principal = await getPrincipal();
-  if (principal.offline && !process.env.TICRM_API_KEY) {
+  if (principal.offline) {
     if (principal.status === 403) {
       redirect('/login?error=Seu%20login%20foi%20autenticado%2C%20mas%20ainda%20nao%20esta%20vinculado%20a%20uma%20empresa.');
     }
@@ -55,5 +55,5 @@ export async function resolveActiveTenantId() {
   const principal = await requireAuthenticatedPrincipal();
   const tenantId = principal.data.tenant_id || getDefaultTenantId();
   const token = await getSessionToken();
-  return { tenantId, principal, authOptions: token ? { bearerToken: token } : {} };
+  return { tenantId, principal, authOptions: token ? { bearerToken: token, apiKeyFallback: false } : { apiKeyFallback: false } };
 }
