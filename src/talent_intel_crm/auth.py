@@ -10,6 +10,10 @@ from hmac import compare_digest
 from time import time
 from typing import Any, Optional
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from fastapi import Header, HTTPException, status
 
 from talent_intel_crm.config import APIConfig
@@ -51,32 +55,94 @@ def _b64url_decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(f"{value}{padding}".encode("ascii"))
 
 
-def _decode_and_verify_jwt(token: str, secret: str) -> dict[str, Any]:
+def _decode_jwt_parts(token: str) -> tuple[dict[str, Any], dict[str, Any], bytes, bytes]:
     try:
         header_raw, payload_raw, signature_raw = token.split(".")
         header = json.loads(_b64url_decode(header_raw))
-        if header.get("alg") != "HS256":
-            raise ValueError("Unsupported JWT algorithm")
         signed = f"{header_raw}.{payload_raw}".encode("ascii")
-        expected = hmac.new(secret.encode("utf-8"), signed, hashlib.sha256).digest()
-        actual = _b64url_decode(signature_raw)
-        if not compare_digest(expected, actual):
-            raise ValueError("Invalid JWT signature")
         payload = json.loads(_b64url_decode(payload_raw))
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token") from exc
 
-    exp = payload.get("exp")
-    if isinstance(exp, (int, float)) and exp < time():
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Expired bearer token")
+    return header, payload, signed, _b64url_decode(signature_raw)
+
+
+def _decode_and_verify_jwt_hs256(token: str, secret: str) -> dict[str, Any]:
+    header, payload, signed, signature = _decode_jwt_parts(token)
+    if header.get("alg") != "HS256":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
+
+    expected = hmac.new(secret.encode("utf-8"), signed, hashlib.sha256).digest()
+    if not compare_digest(expected, signature):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
+    _validate_jwt_payload(payload)
     return payload
 
 
+def _load_jwks(jwks_json: str) -> list[dict[str, Any]]:
+    try:
+        payload = json.loads(jwks_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT auth is not configured") from exc
+
+    keys = payload.get("keys") if isinstance(payload, dict) else payload
+    if not isinstance(keys, list):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT auth is not configured")
+    return [key for key in keys if isinstance(key, dict)]
+
+
+def _find_jwk(header: dict[str, Any], jwks_json: str) -> dict[str, Any]:
+    kid = header.get("kid")
+    alg = header.get("alg")
+    for key in _load_jwks(jwks_json):
+        if key.get("kid") == kid and key.get("alg") == alg:
+            return key
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
+
+
+def _decode_and_verify_jwt_es256(token: str, jwks_json: str) -> dict[str, Any]:
+    header, payload, signed, signature = _decode_jwt_parts(token)
+    if header.get("alg") != "ES256":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
+
+    jwk = _find_jwk(header, jwks_json)
+    if jwk.get("kty") != "EC" or jwk.get("crv") != "P-256":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
+    if len(signature) != 64:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
+
+    try:
+        x = int.from_bytes(_b64url_decode(str(jwk["x"])), "big")
+        y = int.from_bytes(_b64url_decode(str(jwk["y"])), "big")
+        public_key = ec.EllipticCurvePublicNumbers(x, y, ec.SECP256R1()).public_key()
+        der_signature = encode_dss_signature(
+            int.from_bytes(signature[:32], "big"),
+            int.from_bytes(signature[32:], "big"),
+        )
+        public_key.verify(der_signature, signed, ec.ECDSA(hashes.SHA256()))
+    except (KeyError, ValueError, InvalidSignature) as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token") from exc
+
+    _validate_jwt_payload(payload)
+    return payload
+
+
+def _validate_jwt_payload(payload: dict[str, Any]) -> None:
+    exp = payload.get("exp")
+    if isinstance(exp, (int, float)) and exp < time():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Expired bearer token")
+
+
 def _principal_from_bearer_token(token: str, config: APIConfig) -> APIPrincipal:
-    if not config.auth_jwt_secret:
+    header, _, _, _ = _decode_jwt_parts(token)
+    alg = header.get("alg")
+    if alg == "HS256" and config.auth_jwt_secret:
+        payload = _decode_and_verify_jwt_hs256(token, config.auth_jwt_secret)
+    elif alg == "ES256" and config.auth_jwks_json:
+        payload = _decode_and_verify_jwt_es256(token, config.auth_jwks_json)
+    else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT auth is not configured")
 
-    payload = _decode_and_verify_jwt(token, config.auth_jwt_secret)
     user_id = str(payload.get("sub") or "")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bearer token missing user subject")

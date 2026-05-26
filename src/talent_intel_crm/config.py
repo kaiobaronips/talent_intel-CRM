@@ -23,6 +23,7 @@ class APIConfig:
     admin_api_key: Optional[str] = field(default_factory=lambda: os.getenv("TICRM_ADMIN_API_KEY") or os.getenv("TICRM_API_KEY") or None)
     allow_insecure_development_auth: bool = field(default_factory=lambda: os.getenv("TICRM_ALLOW_INSECURE_DEV_AUTH", "false").lower() in {"1", "true", "yes"})
     auth_jwt_secret: Optional[str] = field(default_factory=lambda: os.getenv("TICRM_AUTH_JWT_SECRET") or os.getenv("SUPABASE_JWT_SECRET") or None)
+    auth_jwks_json: Optional[str] = field(default_factory=lambda: os.getenv("TICRM_AUTH_JWKS") or os.getenv("SUPABASE_JWT_JWKS") or os.getenv("SUPABASE_JWKS") or None)
 
 
 @dataclass(frozen=True)
