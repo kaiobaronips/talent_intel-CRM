@@ -34,13 +34,13 @@ export async function Shell({ children, offline = false, title = 'Talent Intel C
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(250,204,21,0.22),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(45,212,191,0.18),transparent_26%),linear-gradient(135deg,#fff7ed_0%,#f8fafc_48%,#ecfeff_100%)]" />
       <div className="pointer-events-none fixed inset-0 -z-10 opacity-[0.18] [background-image:linear-gradient(#292524_1px,transparent_1px),linear-gradient(90deg,#292524_1px,transparent_1px)] [background-size:42px_42px]" />
 
-      <aside className="fixed left-4 top-4 z-20 hidden h-[calc(100vh-2rem)] w-72 rounded-[2.2rem] border border-stone-200 bg-white/72 p-5 shadow-[0_24px_80px_rgba(41,37,36,0.1)] backdrop-blur-xl lg:block">
+      <aside className="fixed left-4 top-4 z-20 hidden h-[calc(100vh-2rem)] w-72 flex-col rounded-[2.2rem] border border-stone-200 bg-white/72 p-5 shadow-[0_24px_80px_rgba(41,37,36,0.1)] backdrop-blur-xl lg:flex">
         <Link href="/" className="block rounded-[1.6rem] bg-stone-950 p-5 text-stone-50">
           <p className="text-xs font-bold uppercase tracking-[0.26em] text-amber-200">Operações SaaS</p>
           <h1 className="mt-4 font-display text-3xl font-black leading-none tracking-[-0.06em]">Talent Intel CRM</h1>
         </Link>
 
-        <nav className="mt-6 space-y-2">
+        <nav className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {navItems(activeTenantId).map((item) => (
             <Link
               key={item.href}
@@ -53,7 +53,7 @@ export async function Shell({ children, offline = false, title = 'Talent Intel C
           ))}
         </nav>
 
-        <div className="absolute bottom-5 left-5 right-5 rounded-[1.5rem] border border-stone-200 bg-stone-50 p-4">
+        <div className="mt-4 rounded-[1.5rem] border border-stone-200 bg-stone-50 p-4">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">API</p>
           <div className="mt-2 flex items-center gap-2 text-sm font-bold">
             <span className={clsx('h-2.5 w-2.5 rounded-full', offline ? 'bg-amber-500' : 'bg-emerald-500')} />
