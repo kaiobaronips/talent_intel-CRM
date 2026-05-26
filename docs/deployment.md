@@ -93,6 +93,27 @@ docker compose -f deploy/compose.production.yml up -d api worker
 
 Inject production variables from the platform secrets manager. Use `deploy/production.env.example` only as the variable contract, not as secret storage.
 
+## Railway Worker MVP
+
+For MVP, the Temporal worker can run as a dedicated Railway service using the root `Dockerfile` and `railway.toml`.
+
+Start command:
+
+```bash
+python -m talent_intel_crm.worker
+```
+
+Required Railway variables:
+
+- `SUPABASE_DB_URL`
+- `TEMPORAL_TARGET_HOST`
+- `TEMPORAL_NAMESPACE`
+- `TEMPORAL_API_KEY`
+- `TEMPORAL_TASK_QUEUE=talent-intel-crm`
+- `TEMPORAL_USE_TLS=true`
+
+Do not configure `NOTION_MIRROR_*` in Railway for the MVP worker unless rate limiting has been handled. Supabase Postgres remains the operational source of truth.
+
 ## API keys
 
 - `TICRM_ADMIN_API_KEY` is environment-scoped and required for tenant onboarding and tenant key creation in production.
