@@ -136,6 +136,33 @@ def test_read_routes_return_projected_records(monkeypatch) -> None:
     assert interactions.json()["data"]["items"] == [{"candidate_id": "candidate-001", "channel": "email"}]
 
 
+def test_candidate_routes_flatten_agent_metadata(monkeypatch) -> None:
+    candidate = {
+        "id": "candidate-001",
+        "tenant_id": "tenant-001",
+        "name": "Candidate One",
+        "stage": "qualified",
+        "metadata_json": {
+            "current_role": "Assessor de Investimentos",
+            "score_overall": 86,
+            "classification": "A",
+        },
+    }
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "get_candidate", lambda _candidate_id: candidate)
+    monkeypatch.setattr(api, "list_tenant_candidates", lambda _tenant_id, _page, _limit: {"items": [candidate], "total": 1})
+    client = TestClient(api.app)
+
+    single = client.get("/v1/candidates/candidate-001")
+    listed = client.get("/v1/tenants/tenant-001/candidates")
+
+    assert single.json()["data"]["current_role"] == "Assessor de Investimentos"
+    assert single.json()["data"]["score_overall"] == 86
+    assert single.json()["data"]["classification"] == "A"
+    assert single.json()["data"]["metadata"]["classification"] == "A"
+    assert listed.json()["data"]["items"][0]["current_role"] == "Assessor de Investimentos"
+
+
 def test_read_routes_return_not_found(monkeypatch) -> None:
     monkeypatch.setattr(api, "get_tenant", lambda _tenant_id: {})
     monkeypatch.setattr(api, "get_candidate", lambda _candidate_id: {})

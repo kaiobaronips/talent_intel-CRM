@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import time
 from typing import Any, Dict, List, Optional
@@ -119,6 +120,22 @@ def _candidate_channels(payload: CandidateCreateRequest) -> List[str]:
     if payload.linkedin_url:
         channels.append(CandidateChannel.LINKEDIN.value)
     return channels
+
+
+def _candidate_projection(candidate: Dict[str, Any]) -> Dict[str, Any]:
+    metadata = candidate.get("metadata_json") or {}
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except json.JSONDecodeError:
+            metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    projected = {**metadata, **candidate}
+    projected["metadata_json"] = metadata
+    projected["metadata"] = metadata
+    return projected
 
 
 def _record_audit_event(
@@ -464,7 +481,7 @@ async def read_candidate(candidate_id: str, principal: APIPrincipal = Depends(re
     if not candidate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
     authorize_tenant(principal, candidate["tenant_id"])
-    return _success(candidate)
+    return _success(_candidate_projection(candidate))
 
 
 @app.get("/v1/tenants/{tenant_id}/candidates")
@@ -478,7 +495,8 @@ async def read_tenant_candidates(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     authorize_tenant(principal, tenant_id)
     result = list_tenant_candidates(tenant_id, page, limit)
-    return _success({"tenant_id": tenant_id, **_page(result["items"], page, limit, result["total"])})
+    items = [_candidate_projection(candidate) for candidate in result["items"]]
+    return _success({"tenant_id": tenant_id, **_page(items, page, limit, result["total"])})
 
 
 @app.get("/v1/candidates/{candidate_id}/interactions")
