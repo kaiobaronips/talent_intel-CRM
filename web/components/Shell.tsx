@@ -28,6 +28,7 @@ type ShellProps = {
 export async function Shell({ children, offline = false, title = 'Talent Intel CRM', subtitle }: ShellProps) {
   const principal = await getPrincipal();
   const activeTenantId = principal.data.tenant_id || getDefaultTenantId();
+  const navigation = navItems(activeTenantId);
 
   return (
     <div className="min-h-screen overflow-hidden bg-[var(--surface)] text-stone-950">
@@ -41,7 +42,7 @@ export async function Shell({ children, offline = false, title = 'Talent Intel C
         </Link>
 
         <nav className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-          {navItems(activeTenantId).map((item) => (
+          {navigation.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -68,6 +69,41 @@ export async function Shell({ children, offline = false, title = 'Talent Intel C
       </aside>
 
       <main className="px-4 py-4 lg:ml-80 lg:px-8 lg:py-8">
+        <details className="reveal group mb-4 rounded-3xl border border-stone-200 bg-white/78 p-3 shadow-[0_18px_60px_rgba(41,37,36,0.08)] backdrop-blur-xl lg:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl bg-stone-950 px-4 py-3 text-stone-50 marker:hidden">
+            <span>
+              <span className="block text-xs font-bold uppercase tracking-[0.22em] text-amber-200">Talent Intel CRM</span>
+              <span className="mt-1 block text-sm font-black">Menu</span>
+            </span>
+            <span className="text-2xl leading-none transition group-open:rotate-45">+</span>
+          </summary>
+          <div className="mt-3 grid gap-2">
+            {navigation.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center justify-between rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-black text-stone-800"
+              >
+                {item.label}
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+              </Link>
+            ))}
+            <div className="mt-2 rounded-2xl border border-stone-200 bg-stone-50 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2 text-sm font-black text-stone-700">
+                  <span className={clsx('h-2.5 w-2.5 rounded-full', offline ? 'bg-amber-500' : 'bg-emerald-500')} />
+                  {offline ? 'Modo demonstração' : 'API conectada'}
+                </span>
+                <form action={logoutAction}>
+                  <button type="submit" className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-black text-stone-700">
+                    Logout
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </details>
+
         <header className="reveal mb-8 rounded-[2.4rem] border border-stone-200 bg-white/70 p-5 shadow-[0_24px_80px_rgba(41,37,36,0.08)] backdrop-blur-xl lg:p-8">
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div>
