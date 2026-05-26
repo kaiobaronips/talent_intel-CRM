@@ -79,16 +79,21 @@ export function CandidateCreateForm({ tenantId }: { tenantId: string }) {
     <form action={action} className="rounded-[2rem] border border-stone-200 bg-white/82 p-5 shadow-[0_24px_70px_rgba(41,37,36,0.08)] backdrop-blur">
       <input type="hidden" name="tenant_id" value={tenantId} />
       <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">Operação</p>
-      <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Adicionar candidato</h2>
+      <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Enviar candidato para agentes</h2>
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Field label="Nome" name="name" placeholder="Nome Sobrenome" required />
         <Field label="ID do candidato opcional" name="candidate_id" placeholder="candidate-empresa-001" />
         <Field label="Cidade" name="city" placeholder="Sao Paulo" />
+        <Field label="Estado" name="state" placeholder="SP" />
         <Field label="E-mail" name="email" type="email" placeholder="talento@email.com" />
         <Field label="URL do LinkedIn" name="linkedin_url" placeholder="https://linkedin.com/in/..." />
+        <Field label="Cargo atual" name="current_role" placeholder="Executivo de contas" />
+        <Field label="Empresa atual" name="current_company" placeholder="Empresa atual" />
+        <Field label="Senioridade" name="seniority" placeholder="Pleno, senior, liderança" />
+        <Field label="Perfil alvo" name="target_profile" placeholder="Vendas B2B, tecnologia, financeiro" />
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <SubmitButton>Enviar para o fluxo de vida</SubmitButton>
+        <SubmitButton>Iniciar análise dos agentes</SubmitButton>
         <ActionFeedback state={state} />
       </div>
     </form>

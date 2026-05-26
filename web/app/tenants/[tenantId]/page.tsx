@@ -65,6 +65,8 @@ export default async function TenantPage({ params }: TenantPageProps) {
           rows={candidatesResult.data.items}
           columns={[
             { key: 'name', label: 'Nome', render: (row) => row.name },
+            { key: 'role', label: 'Cargo', render: (row) => row.current_role ?? '-' },
+            { key: 'score', label: 'Score', render: (row) => row.score_overall ?? '-' },
             { key: 'classification', label: 'Classe', render: (row) => <StatusBadge value={row.classification} /> },
             { key: 'stage', label: 'Etapa', render: (row) => <StatusBadge value={row.stage} /> },
           ]}

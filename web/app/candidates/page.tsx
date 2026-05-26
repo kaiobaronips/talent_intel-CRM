@@ -43,6 +43,8 @@ export default async function CandidatesPage() {
           { key: 'email', label: 'E-mail', render: (row) => row.email ?? '-' },
           { key: 'linkedin', label: 'LinkedIn', render: (row) => (row.linkedin_url ? 'Disponível' : '-') },
           { key: 'role', label: 'Cargo', render: (row) => row.current_role ?? '-' },
+          { key: 'company', label: 'Empresa', render: (row) => row.current_company ?? '-' },
+          { key: 'seniority', label: 'Senioridade', render: (row) => row.seniority ?? '-' },
           { key: 'score', label: 'Pontuação', render: (row) => row.score_overall ?? '-' },
           { key: 'classification', label: 'Classificação', render: (row) => <StatusBadge value={row.classification} /> },
         ]}

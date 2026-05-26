@@ -50,7 +50,7 @@ class CandidateQualificationWorkflow:
         candidate.stage = CandidateStage.QUALIFIED
         classification_result = await workflow.execute_activity(
             classify_candidate_fit,
-            candidate_result(candidate),
+            {**candidate_result(candidate), **candidate.metadata},
             schedule_to_close_timeout=timedelta(minutes=2),
         )
         classification = _extract_activity_payload(classification_result, "classification")

@@ -107,6 +107,11 @@ export async function createCandidateAction(_previousState: ActionState, formDat
   const linkedinUrl = text(formData, 'linkedin_url');
   const city = text(formData, 'city');
   const candidateId = text(formData, 'candidate_id');
+  const currentRole = text(formData, 'current_role');
+  const currentCompany = text(formData, 'current_company');
+  const seniority = text(formData, 'seniority');
+  const targetProfile = text(formData, 'target_profile');
+  const state = text(formData, 'state');
 
   if (!name) {
     return { ...initialError, message: 'O nome do candidato é obrigatório.' };
@@ -123,6 +128,11 @@ export async function createCandidateAction(_previousState: ActionState, formDat
     city,
     email,
     linkedin_url: linkedinUrl,
+    current_role: currentRole,
+    current_company: currentCompany,
+    seniority,
+    target_profile: targetProfile,
+    state,
   }, await authOptions());
 
   if (!result.ok) {

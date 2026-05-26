@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 
 class CandidateChannel(str, Enum):
@@ -44,6 +44,7 @@ class CandidateEnvelope:
     stage: CandidateStage = CandidateStage.INGESTED
     channels: list[CandidateChannel] = field(default_factory=list)
     source_page_id: Optional[str] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

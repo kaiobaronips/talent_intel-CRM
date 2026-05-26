@@ -37,6 +37,7 @@ def _extract_activity_payload(result: dict[str, Any], key: str) -> dict[str, Any
 
 def _candidate_agent_payload(candidate: Any, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     payload = candidate_result(candidate)
+    payload.update(candidate.metadata)
     if metadata:
         payload.update(metadata)
     return payload

@@ -82,6 +82,11 @@ class CandidateCreateRequest(BaseModel):
     linkedin_url: str = Field(default="", max_length=1000)
     channels: List[CandidateChannel] = Field(default_factory=list)
     source_page_id: Optional[str] = Field(default=None, max_length=240)
+    current_role: str = Field(default="", max_length=240)
+    current_company: str = Field(default="", max_length=240)
+    seniority: str = Field(default="", max_length=120)
+    target_profile: str = Field(default="", max_length=240)
+    state: str = Field(default="", max_length=80)
 
 
 class TenantMembershipUpsertRequest(BaseModel):
@@ -442,6 +447,13 @@ async def create_candidate(payload: CandidateCreateRequest, principal: APIPrinci
                 "channels": channels,
                 "source_page_id": payload.source_page_id,
                 "stage": CandidateStage.INGESTED.value,
+                "metadata": {
+                    "current_role": payload.current_role,
+                    "current_company": payload.current_company,
+                    "seniority": payload.seniority,
+                    "target_profile": payload.target_profile,
+                    "state": payload.state,
+                },
             },
             id=f"candidate-lifecycle::{payload.tenant_id}::{candidate_id}",
             task_queue=TemporalConfig().task_queue,
@@ -460,6 +472,11 @@ async def create_candidate(payload: CandidateCreateRequest, principal: APIPrinci
             "email": payload.email,
             "linkedin_url": payload.linkedin_url,
             "channels": channels,
+            "current_role": payload.current_role,
+            "current_company": payload.current_company,
+            "seniority": payload.seniority,
+            "target_profile": payload.target_profile,
+            "state": payload.state,
             "workflow_id": handle.id,
             "run_id": handle.result_run_id,
         },

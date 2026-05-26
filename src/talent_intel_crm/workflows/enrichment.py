@@ -50,7 +50,7 @@ class CandidateEnrichmentWorkflow:
         candidate.stage = CandidateStage.ENRICHED
         enrichment_result = await workflow.execute_activity(
             enrich_candidate_profile,
-            candidate_result(candidate),
+            {**candidate_result(candidate), **candidate.metadata},
             schedule_to_close_timeout=timedelta(minutes=2),
         )
         enrichment = _extract_activity_payload(enrichment_result, "enrichment")
