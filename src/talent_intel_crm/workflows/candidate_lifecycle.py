@@ -1,10 +1,11 @@
 from datetime import timedelta
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
+    from talent_intel_crm.activities.agents import classify_candidate_fit, enrich_candidate_profile, render_outreach_message
     from talent_intel_crm.activities.email import send_initial_email
     from talent_intel_crm.activities.linkedin import enqueue_linkedin_message
     from talent_intel_crm.activities.persistence import append_interaction, record_audit_event, record_workflow_run, upsert_candidate_record
@@ -13,6 +14,32 @@ with workflow.unsafe.imports_passed_through():
 
 
 PERSISTENCE_TIMEOUT = timedelta(minutes=2)
+AGENT_TIMEOUT = timedelta(minutes=2)
+
+
+def _extract_activity_payload(result: dict[str, Any], key: str) -> dict[str, Any]:
+    result_payload = result.get("result", {})
+    if not isinstance(result_payload, dict):
+        return {}
+
+    response = result_payload.get("response")
+    if isinstance(response, dict):
+        value = response.get(key)
+        if isinstance(value, dict):
+            return value
+        return response
+
+    value = result_payload.get(key)
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def _candidate_agent_payload(candidate: Any, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    payload = candidate_result(candidate)
+    if metadata:
+        payload.update(metadata)
+    return payload
 
 
 @workflow.defn
@@ -49,17 +76,40 @@ class CandidateLifecycleWorkflow:
         )
 
         candidate.stage = CandidateStage.ENRICHED
+        enrichment_result = await workflow.execute_activity(
+            enrich_candidate_profile,
+            _candidate_agent_payload(candidate),
+            schedule_to_close_timeout=AGENT_TIMEOUT,
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+        enrichment = _extract_activity_payload(enrichment_result, "enrichment")
+        agent_metadata: dict[str, Any] = {
+            **enrichment,
+            "enrichment": enrichment,
+        }
         await workflow.execute_activity(
             upsert_candidate_record,
-            candidate_record(candidate, CandidateStage.ENRICHED),
+            candidate_record(candidate, CandidateStage.ENRICHED, **agent_metadata),
             schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
         candidate.stage = CandidateStage.QUALIFIED
+        classification_result = await workflow.execute_activity(
+            classify_candidate_fit,
+            _candidate_agent_payload(candidate, agent_metadata),
+            schedule_to_close_timeout=AGENT_TIMEOUT,
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+        classification = _extract_activity_payload(classification_result, "classification")
+        agent_metadata = {
+            **agent_metadata,
+            **classification,
+            "classification_detail": classification,
+        }
         await workflow.execute_activity(
             upsert_candidate_record,
-            candidate_record(candidate, CandidateStage.QUALIFIED),
+            candidate_record(candidate, CandidateStage.QUALIFIED, **agent_metadata),
             schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
@@ -67,12 +117,26 @@ class CandidateLifecycleWorkflow:
         candidate.stage = CandidateStage.READY_TO_CONTACT
         await workflow.execute_activity(
             upsert_candidate_record,
-            candidate_record(candidate, CandidateStage.READY_TO_CONTACT),
+            candidate_record(candidate, CandidateStage.READY_TO_CONTACT, **agent_metadata),
             schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
         if CandidateChannel.EMAIL in candidate.channels and candidate.email:
+            email_message_result = await workflow.execute_activity(
+                render_outreach_message,
+                _candidate_agent_payload(
+                    candidate,
+                    {
+                        **agent_metadata,
+                        "channel": CandidateChannel.EMAIL.value,
+                        "message_type": "initial",
+                    },
+                ),
+                schedule_to_close_timeout=AGENT_TIMEOUT,
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+            email_message = _extract_activity_payload(email_message_result, "message")
             await workflow.execute_activity(
                 send_initial_email,
                 {
@@ -84,18 +148,36 @@ class CandidateLifecycleWorkflow:
                     "source_page_id": candidate.source_page_id,
                     "channel": CandidateChannel.EMAIL.value,
                     "message_type": "initial",
+                    "message": email_message,
                 },
                 schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
+            email_interaction = interaction_record(candidate, CandidateChannel.EMAIL, "initial")
+            email_interaction["message"] = email_message
+            email_interaction["metadata"] = agent_metadata
             await workflow.execute_activity(
                 append_interaction,
-                interaction_record(candidate, CandidateChannel.EMAIL, "initial"),
+                email_interaction,
                 schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
 
         if CandidateChannel.LINKEDIN in candidate.channels and candidate.linkedin_url:
+            linkedin_message_result = await workflow.execute_activity(
+                render_outreach_message,
+                _candidate_agent_payload(
+                    candidate,
+                    {
+                        **agent_metadata,
+                        "channel": CandidateChannel.LINKEDIN.value,
+                        "message_type": "initial",
+                    },
+                ),
+                schedule_to_close_timeout=AGENT_TIMEOUT,
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+            linkedin_message = _extract_activity_payload(linkedin_message_result, "message")
             await workflow.execute_activity(
                 enqueue_linkedin_message,
                 {
@@ -107,13 +189,17 @@ class CandidateLifecycleWorkflow:
                     "source_page_id": candidate.source_page_id,
                     "channel": CandidateChannel.LINKEDIN.value,
                     "message_type": "initial",
+                    "message": linkedin_message,
                 },
                 schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
+            linkedin_interaction = interaction_record(candidate, CandidateChannel.LINKEDIN, "initial")
+            linkedin_interaction["message"] = linkedin_message
+            linkedin_interaction["metadata"] = agent_metadata
             await workflow.execute_activity(
                 append_interaction,
-                interaction_record(candidate, CandidateChannel.LINKEDIN, "initial"),
+                linkedin_interaction,
                 schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
@@ -125,7 +211,7 @@ class CandidateLifecycleWorkflow:
 
         await workflow.execute_activity(
             upsert_candidate_record,
-            candidate_record(candidate, candidate.stage),
+            candidate_record(candidate, candidate.stage, **agent_metadata),
             schedule_to_close_timeout=PERSISTENCE_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3),
         )

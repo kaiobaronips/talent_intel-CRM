@@ -4,9 +4,26 @@ from typing import Any, Dict
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
+    from talent_intel_crm.activities.agents import classify_candidate_fit
     from talent_intel_crm.activities.persistence import record_audit_event, record_workflow_run, upsert_candidate_record
     from talent_intel_crm.candidate_payload import candidate_from_input, candidate_record, candidate_result
     from talent_intel_crm.domain import CandidateStage
+
+
+def _extract_activity_payload(result: dict[str, Any], key: str) -> dict[str, Any]:
+    result_payload = result.get("result", {})
+    if not isinstance(result_payload, dict):
+        return {}
+    response = result_payload.get("response")
+    if isinstance(response, dict):
+        value = response.get(key)
+        if isinstance(value, dict):
+            return value
+        return response
+    value = result_payload.get(key)
+    if isinstance(value, dict):
+        return value
+    return {}
 
 
 @workflow.defn
@@ -31,9 +48,20 @@ class CandidateQualificationWorkflow:
             schedule_to_close_timeout=timedelta(seconds=30),
         )
         candidate.stage = CandidateStage.QUALIFIED
+        classification_result = await workflow.execute_activity(
+            classify_candidate_fit,
+            candidate_result(candidate),
+            schedule_to_close_timeout=timedelta(minutes=2),
+        )
+        classification = _extract_activity_payload(classification_result, "classification")
+        metadata = {
+            "phase": "qualification",
+            **classification,
+            "classification_detail": classification,
+        }
         await workflow.execute_activity(
             upsert_candidate_record,
-            candidate_record(candidate, candidate.stage, phase="qualification", score_mode="informational_only"),
+            candidate_record(candidate, candidate.stage, **metadata),
             schedule_to_close_timeout=timedelta(seconds=30),
         )
         await workflow.execute_activity(

@@ -79,6 +79,10 @@ As activities usam `Supabase Postgres` como persistencia principal e webhooks op
 - `SUPABASE_DB_URL`
 - `EMAIL_SEND_WEBHOOK_URL`
 - `LINKEDIN_SEND_WEBHOOK_URL`
+- `LINKEDIN_SEARCH_WEBHOOK_URL`
+- `CANDIDATE_ENRICHMENT_WEBHOOK_URL`
+- `CANDIDATE_CLASSIFICATION_WEBHOOK_URL`
+- `OUTREACH_TEMPLATE_WEBHOOK_URL`
 - `NOTION_MIRROR_API_TOKEN`
 - `NOTION_MIRROR_TENANTS_DATA_SOURCE_ID`
 - `NOTION_MIRROR_CANDIDATES_DATA_SOURCE_ID`
@@ -86,7 +90,16 @@ As activities usam `Supabase Postgres` como persistencia principal e webhooks op
 - `NOTION_MIRROR_WORKFLOW_RUNS_DATA_SOURCE_ID`
 - `NOTION_MIRROR_AUDIT_EVENTS_DATA_SOURCE_ID`
 
-Se os endpoints de canal nao estiverem configurados, a activity roda em `dry-run` e retorna o payload que seria enviado. Isso permite validar o fluxo Temporal sem acoplar credenciais antes da hora.
+Se os endpoints de canal ou agentes nao estiverem configurados, a activity roda em `dry-run` e retorna o payload que seria enviado. Isso permite validar o fluxo Temporal sem acoplar credenciais antes da hora.
+
+O lifecycle do candidato ja chama agentes operacionais em sequencia:
+
+1. enriquecimento de perfil
+2. classificacao de fit
+3. renderizacao de mensagem por canal
+4. envio por email e/ou LinkedIn
+
+Os webhooks podem ser conectados a provedores reais de sourcing, enriquecimento, LLM ou automacao de canal mantendo o mesmo contrato de workflow.
 
 ## Cadencia
 

@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from temporalio.worker import Worker
 
 from talent_intel_crm.client import connect_temporal
+from talent_intel_crm.activities.agents import classify_candidate_fit, enrich_candidate_profile, render_outreach_message, search_linkedin_candidates
 from talent_intel_crm.activities.email import send_initial_email
 from talent_intel_crm.activities.linkedin import enqueue_linkedin_message
 from talent_intel_crm.activities.persistence import (
@@ -42,6 +43,10 @@ async def main() -> None:
             append_interaction,
             record_audit_event,
             record_workflow_run,
+            search_linkedin_candidates,
+            enrich_candidate_profile,
+            classify_candidate_fit,
+            render_outreach_message,
             send_initial_email,
             enqueue_linkedin_message,
         ],
