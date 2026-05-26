@@ -3,7 +3,7 @@ import Link from 'next/link';
 import clsx from 'clsx';
 import { logoutAction } from '@/app/actions';
 import { getDefaultTenantId } from '@/lib/api';
-import { getPrincipal, getSessionToken } from '@/lib/session';
+import { getPrincipal } from '@/lib/session';
 
 function navItems(activeTenantId: string) {
   return [
@@ -26,7 +26,6 @@ type ShellProps = {
 };
 
 export async function Shell({ children, offline = false, title = 'Talent Intel CRM', subtitle }: ShellProps) {
-  const hasSession = Boolean(await getSessionToken());
   const principal = await getPrincipal();
   const activeTenantId = principal.data.tenant_id || getDefaultTenantId();
 
@@ -60,13 +59,11 @@ export async function Shell({ children, offline = false, title = 'Talent Intel C
             <span className={clsx('h-2.5 w-2.5 rounded-full', offline ? 'bg-amber-500' : 'bg-emerald-500')} />
             {offline ? 'Modo demonstração' : 'Conectada'}
           </div>
-          {hasSession ? (
-            <form action={logoutAction} className="mt-4">
-              <button type="submit" className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-black text-stone-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">
-                Sair
-              </button>
-            </form>
-          ) : null}
+          <form action={logoutAction} className="mt-4">
+            <button type="submit" className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-black text-stone-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">
+              Logout
+            </button>
+          </form>
         </div>
       </aside>
 
@@ -82,13 +79,11 @@ export async function Shell({ children, offline = false, title = 'Talent Intel C
               <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-bold text-stone-700">
                 {offline ? 'Dados locais/fallback' : 'Dados reais da API'}
               </div>
-              {hasSession ? (
-                <form action={logoutAction}>
-                  <button type="submit" className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">
-                    Sair
-                  </button>
-                </form>
-              ) : null}
+              <form action={logoutAction}>
+                <button type="submit" className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">
+                  Logout
+                </button>
+              </form>
             </div>
           </div>
         </header>
