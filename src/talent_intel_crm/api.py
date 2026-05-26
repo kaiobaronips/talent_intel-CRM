@@ -464,7 +464,6 @@ async def create_candidate(payload: CandidateCreateRequest, principal: APIPrinci
         tenant_id=payload.tenant_id,
         event_type="candidate.create_requested",
         principal=principal,
-        candidate_id=candidate_id,
         payload={
             "candidate_id": candidate_id,
             "name": payload.name,

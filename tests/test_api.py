@@ -325,6 +325,8 @@ def test_mutating_routes_append_audit_events(monkeypatch) -> None:
         "tenant_api_key.created",
         "candidate.create_requested",
     ]
+    assert events[-1]["candidate_id"] is None
+    assert events[-1]["payload"]["candidate_id"] == candidate.json()["data"]["candidate_id"]
     assert all("access_token" not in json.dumps(event) and "refresh_token" not in json.dumps(event) for event in events)
 
 
