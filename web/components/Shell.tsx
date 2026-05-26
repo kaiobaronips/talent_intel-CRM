@@ -79,11 +79,6 @@ export async function Shell({ children, offline = false, title = 'Talent Intel C
               <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-bold text-stone-700">
                 {offline ? 'Dados locais/fallback' : 'Dados reais da API'}
               </div>
-              <form action={logoutAction}>
-                <button type="submit" className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">
-                  Logout
-                </button>
-              </form>
             </div>
           </div>
         </header>
