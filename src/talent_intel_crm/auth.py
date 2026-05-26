@@ -5,6 +5,8 @@ import hashlib
 import hmac
 import json
 import secrets
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from hmac import compare_digest
 from time import time
@@ -133,16 +135,51 @@ def _validate_jwt_payload(payload: dict[str, Any]) -> None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Expired bearer token")
 
 
-def _principal_from_bearer_token(token: str, config: APIConfig) -> APIPrincipal:
-    header, _, _, _ = _decode_jwt_parts(token)
-    alg = header.get("alg")
-    if alg == "HS256" and config.auth_jwt_secret:
-        payload = _decode_and_verify_jwt_hs256(token, config.auth_jwt_secret)
-    elif alg == "ES256" and config.auth_jwks_json:
-        payload = _decode_and_verify_jwt_es256(token, config.auth_jwks_json)
-    else:
+def _fetch_supabase_user(token: str, config: APIConfig) -> dict[str, Any]:
+    supabase_url = config.supabase_url.rstrip("/")
+    if not supabase_url or not config.supabase_anon_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT auth is not configured")
 
+    request = urllib.request.Request(
+        f"{supabase_url}/auth/v1/user",
+        headers={
+            "apikey": config.supabase_anon_key,
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token") from exc
+
+
+def _decode_bearer_payload(token: str, config: APIConfig) -> dict[str, Any]:
+    local_auth_error: Optional[HTTPException] = None
+    try:
+        header, _, _, _ = _decode_jwt_parts(token)
+        alg = header.get("alg")
+        if alg == "HS256" and config.auth_jwt_secret:
+            return _decode_and_verify_jwt_hs256(token, config.auth_jwt_secret)
+        if alg == "ES256" and config.auth_jwks_json:
+            return _decode_and_verify_jwt_es256(token, config.auth_jwks_json)
+        local_auth_error = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT auth is not configured")
+    except HTTPException as exc:
+        local_auth_error = exc
+
+    if config.supabase_url and config.supabase_anon_key:
+        user = _fetch_supabase_user(token, config)
+        return {
+            "sub": user.get("id"),
+            "email": user.get("email"),
+        }
+
+    raise local_auth_error or HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
+
+
+def _principal_from_bearer_token(token: str, config: APIConfig) -> APIPrincipal:
+    payload = _decode_bearer_payload(token, config)
     user_id = str(payload.get("sub") or "")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bearer token missing user subject")

@@ -24,6 +24,8 @@ class APIConfig:
     allow_insecure_development_auth: bool = field(default_factory=lambda: os.getenv("TICRM_ALLOW_INSECURE_DEV_AUTH", "false").lower() in {"1", "true", "yes"})
     auth_jwt_secret: Optional[str] = field(default_factory=lambda: os.getenv("TICRM_AUTH_JWT_SECRET") or os.getenv("SUPABASE_JWT_SECRET") or None)
     auth_jwks_json: Optional[str] = field(default_factory=lambda: os.getenv("TICRM_AUTH_JWKS") or os.getenv("SUPABASE_JWT_JWKS") or os.getenv("SUPABASE_JWKS") or None)
+    supabase_url: str = field(default_factory=lambda: os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "")
+    supabase_anon_key: str = field(default_factory=lambda: os.getenv("SUPABASE_ANON_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or "")
 
 
 @dataclass(frozen=True)

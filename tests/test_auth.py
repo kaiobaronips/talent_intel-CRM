@@ -150,3 +150,30 @@ def test_es256_bearer_token_rejects_unknown_key(monkeypatch) -> None:
         require_principal(authorization=f"Bearer {token}")
 
     assert exc.value.status_code == 401
+
+
+def test_bearer_token_uses_supabase_user_fallback(monkeypatch) -> None:
+    token = _jwt({"sub": "user-001", "email": "user@example.com", "exp": int(time.time()) + 300}, "right-secret")
+    monkeypatch.setenv("TICRM_AUTH_JWT_SECRET", "wrong-secret")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-key")
+    monkeypatch.setattr(
+        "talent_intel_crm.auth._fetch_supabase_user",
+        lambda bearer_token, _config: {"id": "user-from-supabase", "email": "user@example.com"} if bearer_token == token else {},
+    )
+    monkeypatch.setattr(
+        "talent_intel_crm.auth.find_tenant_membership_by_user",
+        lambda user_id: {
+            "tenant_id": "tenant-001",
+            "user_id": user_id,
+            "email": "user@example.com",
+            "role": "owner",
+        },
+    )
+
+    principal = require_principal(authorization=f"Bearer {token}")
+
+    assert principal.role == "owner"
+    assert principal.tenant_id == "tenant-001"
+    assert principal.user_id == "user-from-supabase"
+    assert principal.email == "user@example.com"
