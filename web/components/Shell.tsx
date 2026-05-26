@@ -78,8 +78,17 @@ export async function Shell({ children, offline = false, title = 'Talent Intel C
               <h1 className="mt-3 max-w-4xl font-display text-4xl font-black leading-[0.95] tracking-[-0.07em] text-stone-950 lg:text-6xl">{title}</h1>
               {subtitle ? <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-stone-600">{subtitle}</p> : null}
             </div>
-            <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-bold text-stone-700">
-              {offline ? 'Dados locais/fallback' : 'Dados reais da API'}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-bold text-stone-700">
+                {offline ? 'Dados locais/fallback' : 'Dados reais da API'}
+              </div>
+              {hasSession ? (
+                <form action={logoutAction}>
+                  <button type="submit" className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">
+                    Sair
+                  </button>
+                </form>
+              ) : null}
             </div>
           </div>
         </header>
