@@ -58,7 +58,7 @@ export async function apiGetRaw<T>(path: string, fallback: T, options: ApiAuthOp
         data: fallback,
         offline: true,
         status: response.status,
-        message: payload.detail ?? `API retornou HTTP ${response.status}`,
+        message: payload.detail ?? `O serviço retornou erro HTTP ${response.status}`,
       };
     }
 
@@ -66,7 +66,7 @@ export async function apiGetRaw<T>(path: string, fallback: T, options: ApiAuthOp
     const data = isEnvelope(payload) ? payload.data : payload;
 
     if (data === undefined || data === null) {
-      return { data: fallback, offline: true, status: response.status, message: 'API retornou resposta vazia.' };
+      return { data: fallback, offline: true, status: response.status, message: 'O serviço retornou uma resposta vazia.' };
     }
 
     return { data: data as T, offline: false, status: response.status };
@@ -75,7 +75,7 @@ export async function apiGetRaw<T>(path: string, fallback: T, options: ApiAuthOp
       data: fallback,
       offline: true,
       status: 0,
-      message: error instanceof Error ? error.message : 'Falha desconhecida ao chamar API.',
+      message: error instanceof Error ? error.message : 'Falha desconhecida ao chamar o serviço.',
     };
   }
 }
@@ -97,7 +97,7 @@ export async function apiMutation<T>(path: string, method: 'POST' | 'DELETE', bo
       return {
         ok: false,
         status: response.status,
-        message: payload.detail ?? `API retornou HTTP ${response.status}`,
+        message: payload.detail ?? `O serviço retornou erro HTTP ${response.status}`,
       };
     }
 
@@ -111,7 +111,7 @@ export async function apiMutation<T>(path: string, method: 'POST' | 'DELETE', bo
     return {
       ok: false,
       status: 0,
-      message: error instanceof Error ? error.message : 'Falha desconhecida ao chamar API.',
+      message: error instanceof Error ? error.message : 'Falha desconhecida ao chamar o serviço.',
     };
   }
 }

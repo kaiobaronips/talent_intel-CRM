@@ -16,30 +16,30 @@ export default async function SystemPage() {
   return (
     <Shell
       offline={offline}
-      title="Prontidão do sistema"
-      subtitle="Painel técnico para validar API, Postgres/Supabase e alvo Temporal antes de operar cadências reais."
+      title="Saúde do sistema"
+      subtitle="Confirme se os serviços principais estão disponíveis para cadastrar candidatos e executar as automações de IA."
     >
       <section className="stagger grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="API" value={offline ? 'offline' : 'online'} detail={health.service ?? 'serviço'} accent={offline ? 'amber' : 'green'} />
-        <MetricCard label="Postgres" value={readiness.postgres ? 'pronto' : 'não pronto'} detail="/ready" accent={readiness.postgres ? 'green' : 'amber'} />
-        <MetricCard label="Namespace Temporal" value={health.temporal_namespace ?? 'desconhecido'} accent="blue" />
-        <MetricCard label="Host Temporal" value={health.temporal_target_host ?? 'desconhecido'} accent="ink" />
+        <MetricCard label="Aplicação" value={offline ? 'offline' : 'online'} detail={health.service ?? 'serviço'} accent={offline ? 'amber' : 'green'} />
+        <MetricCard label="Banco de dados" value={readiness.postgres ? 'pronto' : 'não pronto'} detail="Supabase" accent={readiness.postgres ? 'green' : 'amber'} />
+        <MetricCard label="Automações" value={health.temporal_namespace ? 'ativas' : 'verificar'} detail="orquestrador" accent="blue" />
+        <MetricCard label="Destino dos fluxos" value={health.temporal_target_host ?? 'desconhecido'} accent="ink" />
       </section>
 
-      <section className="rounded-[2rem] border border-stone-200 bg-white/82 p-5 shadow-[0_24px_70px_rgba(41,37,36,0.08)] backdrop-blur">
-        <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">Critérios</p>
-        <h2 className="mt-2 font-display text-2xl font-black tracking-[-0.04em]">Critérios para operar</h2>
+      <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <p className="text-xs font-bold uppercase text-amber-700">Critérios</p>
+        <h2 className="mt-2 font-display text-2xl font-black">Critérios para operar</h2>
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl bg-stone-50 p-4">
-            <p className="font-bold text-stone-950">API acessível</p>
+          <div className="rounded-lg bg-stone-50 p-4">
+            <p className="font-bold text-stone-950">Aplicação acessível</p>
             <div className="mt-2"><StatusBadge value={offline ? 'erro' : 'active'} label={offline ? 'Falhou' : 'OK'} /></div>
           </div>
-          <div className="rounded-2xl bg-stone-50 p-4">
+          <div className="rounded-lg bg-stone-50 p-4">
             <p className="font-bold text-stone-950">Banco pronto</p>
             <div className="mt-2"><StatusBadge value={readiness.postgres ? 'active' : 'erro'} label={readiness.postgres ? 'OK' : 'Falhou'} /></div>
           </div>
-          <div className="rounded-2xl bg-stone-50 p-4">
-            <p className="font-bold text-stone-950">Temporal configurado</p>
+          <div className="rounded-lg bg-stone-50 p-4">
+            <p className="font-bold text-stone-950">Automações configuradas</p>
             <div className="mt-2"><StatusBadge value={health.temporal_target_host && health.temporal_target_host !== 'unknown' ? 'active' : 'erro'} label={health.temporal_target_host && health.temporal_target_host !== 'unknown' ? 'OK' : 'Falhou'} /></div>
           </div>
         </div>

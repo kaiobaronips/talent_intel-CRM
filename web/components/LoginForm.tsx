@@ -20,7 +20,7 @@ export function LoginForm() {
 
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-stone-200" />
-        <span className="text-xs font-bold uppercase tracking-[0.2em] text-stone-400">ou</span>
+        <span className="text-xs font-bold uppercase text-stone-400">ou</span>
         <span className="h-px flex-1 bg-stone-200" />
       </div>
 

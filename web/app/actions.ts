@@ -97,7 +97,7 @@ export async function createTenantAction(_previousState: ActionState, formData: 
   }
 
   revalidateTenantViews(tenantId);
-  return { ok: true, message: `Empresa ${tenantId} enviada para onboarding.` };
+  return { ok: true, message: `Empresa ${tenantId} cadastrada e enviada para configuração inicial.` };
 }
 
 export async function createCandidateAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
@@ -118,7 +118,7 @@ export async function createCandidateAction(_previousState: ActionState, formDat
   }
 
   if (!email && !linkedinUrl) {
-    return { ...initialError, message: 'Informe e-mail ou LinkedIn para iniciar a cadência.' };
+    return { ...initialError, message: 'Informe e-mail ou LinkedIn para iniciar o contato.' };
   }
 
   const result = await apiMutation<{ workflow_id: string; candidate_id: string; channels: string[] }>('/v1/candidates', 'POST', {
@@ -140,7 +140,7 @@ export async function createCandidateAction(_previousState: ActionState, formDat
   }
 
   revalidateTenantViews(tenantId);
-  return { ok: true, message: `Candidato ${result.data?.candidate_id ?? name} enviado para o ciclo de vida.` };
+  return { ok: true, message: `Candidato ${result.data?.candidate_id ?? name} enviado para análise dos agentes.` };
 }
 
 export async function createApiKeyAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
@@ -156,7 +156,7 @@ export async function createApiKeyAction(_previousState: ActionState, formData: 
   revalidateTenantViews(tenantId);
   return {
     ok: true,
-    message: `Chave ${result.data?.key?.id ?? label} criada. Copie agora: ela não será exibida novamente.`,
+    message: `Chave ${result.data?.key?.id ?? label} criada. Guarde agora: ela não será exibida novamente.`,
     secret: result.data?.api_key,
   };
 }
@@ -166,7 +166,7 @@ export async function revokeApiKeyAction(_previousState: ActionState, formData: 
   const keyId = text(formData, 'api_key_id');
 
   if (!keyId) {
-    return { ...initialError, message: 'O ID da chave de API é obrigatório.' };
+    return { ...initialError, message: 'O ID da chave de integração é obrigatório.' };
   }
 
   const result = await apiMutation<{ tenant_id: string }>(`/v1/tenants/${tenantId}/api-keys/${keyId}`, 'DELETE', undefined, await authOptions());
@@ -185,7 +185,7 @@ export async function rotateApiKeyAction(_previousState: ActionState, formData: 
   const label = text(formData, 'label') || 'rotated';
 
   if (!keyId) {
-    return { ...initialError, message: 'O ID da chave de API é obrigatório.' };
+    return { ...initialError, message: 'O ID da chave de integração é obrigatório.' };
   }
 
   const result = await apiMutation<{ api_key: string; key: { id: string } }>(`/v1/tenants/${tenantId}/api-keys/${keyId}/rotate`, 'POST', { label }, await authOptions());
@@ -197,7 +197,7 @@ export async function rotateApiKeyAction(_previousState: ActionState, formData: 
   revalidateTenantViews(tenantId);
   return {
     ok: true,
-    message: `Chave ${keyId} rotacionada. Copie a nova chave agora.`,
+    message: `Chave ${keyId} trocada. Guarde a nova chave agora.`,
     secret: result.data?.api_key,
   };
 }

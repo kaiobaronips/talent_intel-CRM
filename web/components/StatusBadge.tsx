@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { formatStatus } from '@/lib/format';
 
 const toneByValue: Record<string, string> = {
   active: 'border-emerald-300 bg-emerald-50 text-emerald-800',
@@ -51,14 +52,14 @@ type StatusBadgeProps = {
 };
 
 export function StatusBadge({ value, label, className }: StatusBadgeProps) {
-  const text = label ?? String(value ?? 'sem status');
+  const text = label ?? String(value ?? 'Sem informação');
   const key = text.toLowerCase();
-  const translated = label ?? labelByValue[key] ?? text;
+  const translated = label ?? labelByValue[key] ?? formatStatus(text);
 
   return (
     <span
       className={clsx(
-        'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-[0.02em]',
+        'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold',
         toneByValue[key] ?? 'border-stone-300 bg-stone-100 text-stone-800',
         className,
       )}

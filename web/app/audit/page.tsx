@@ -4,6 +4,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
 import { getAuditEvents } from '@/lib/api';
+import { formatDateTime, formatEventName, shortId } from '@/lib/format';
 import { resolveActiveTenantId } from '@/lib/session';
 import type { AuditEvent } from '@/lib/types';
 
@@ -17,7 +18,7 @@ export default async function AuditPage() {
   const systemEvents = events.filter((event) => event.actor_type === 'system').length;
 
   return (
-    <Shell offline={auditResult.offline || principal.offline} title="Auditoria operacional" subtitle="Trilha de eventos por empresa para diagnosticar fluxos, cadências e ações automáticas.">
+    <Shell offline={auditResult.offline || principal.offline} title="Histórico de atividades" subtitle="Registro das principais ações realizadas pela plataforma, pelos agentes de IA e pelos usuários da empresa.">
       <section className="stagger grid gap-4 md:grid-cols-3">
         <MetricCard label="Eventos" value={auditResult.data.pagination.total} accent="ink" />
         <MetricCard label="Com candidato" value={candidateEvents} accent="blue" />
@@ -31,10 +32,10 @@ export default async function AuditPage() {
         title="Eventos recentes"
         rows={events}
         columns={[
-          { key: 'event', label: 'Evento', render: (row) => <StatusBadge value={row.event_type} /> },
+          { key: 'event', label: 'Evento', render: (row) => <StatusBadge value={row.event_type} label={formatEventName(row.event_type)} /> },
           { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_id ?? '-' },
-          { key: 'actor', label: 'Ator', render: (row) => `${row.actor_type ?? 'sistema'} / ${row.actor_id ?? '-'}` },
-          { key: 'created', label: 'Criado em', render: (row) => row.created_at ?? '-' },
+          { key: 'actor', label: 'Origem', render: (row) => row.actor_type === 'system' ? 'Automação da plataforma' : shortId(row.actor_id ?? row.actor_type) },
+          { key: 'created', label: 'Data', render: (row) => formatDateTime(row.created_at) },
         ]}
       />
     </Shell>

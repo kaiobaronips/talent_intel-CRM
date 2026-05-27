@@ -18,23 +18,23 @@ export default async function InteractionsPage() {
   const backlogTotal = metricsResult.data.channel_backlog.reduce((sum, item) => sum + item.pending, 0);
 
   return (
-    <Shell offline={interactionsResult.offline || metricsResult.offline} title="Interações por canal" subtitle="Fila separada por LinkedIn e e-mail. Não existe bloqueio operacional por score ou canal alternativo.">
+    <Shell offline={interactionsResult.offline || metricsResult.offline} title="Contatos com candidatos" subtitle="Veja quais mensagens estão pendentes por canal e acompanhe a próxima ação planejada para cada candidato.">
       <section className="stagger grid gap-4 md:grid-cols-3">
-        <MetricCard label="Fila total" value={backlogTotal} accent="amber" />
-        <MetricCard label="LinkedIn" value={linkedin} detail="interações" accent="blue" />
-        <MetricCard label="E-mail" value={email} detail="interações" accent="green" />
+        <MetricCard label="Contatos pendentes" value={backlogTotal} accent="amber" />
+        <MetricCard label="LinkedIn" value={linkedin} detail="abordagens" accent="blue" />
+        <MetricCard label="E-mail" value={email} detail="abordagens" accent="green" />
       </section>
 
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={interactionsResult.offline || metricsResult.offline || principal.offline} />
 
       <DataTable<Interaction>
         eyebrow="Cadência"
-        title="Fila operacional"
+        title="Abordagens planejadas"
         rows={interactions}
         columns={[
           { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_name ?? row.candidate_id },
           { key: 'channel', label: 'Canal', render: (row) => <StatusBadge value={row.channel} /> },
-          { key: 'interaction', label: 'Interação', render: (row) => <StatusBadge value={row.interaction_status} /> },
+          { key: 'interaction', label: 'Situação', render: (row) => <StatusBadge value={row.interaction_status} /> },
           { key: 'next', label: 'Próxima ação', render: (row) => <StatusBadge value={row.next_action} /> },
           { key: 'sent', label: 'Mensagem', render: (row) => row.message_sent ?? '-' },
           { key: 'response', label: 'Resposta', render: (row) => row.response_received ?? '-' },

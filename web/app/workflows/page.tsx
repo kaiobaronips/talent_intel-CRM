@@ -4,6 +4,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
 import { getWorkflowRuns } from '@/lib/api';
+import { formatDateTime, formatWorkflowName, shortId } from '@/lib/format';
 import { resolveActiveTenantId } from '@/lib/session';
 import type { WorkflowRun } from '@/lib/types';
 
@@ -17,25 +18,25 @@ export default async function WorkflowsPage() {
   const running = runs.filter((run) => run.status === 'Running').length;
 
   return (
-    <Shell offline={workflowResult.offline || principal.offline} title="Execuções de fluxo" subtitle="Observabilidade dos fluxos Temporal por empresa.">
+    <Shell offline={workflowResult.offline || principal.offline} title="Automações de IA" subtitle="Acompanhe as rotinas que analisam candidatos, calculam aderência e preparam contatos por e-mail e LinkedIn.">
       <section className="stagger grid gap-4 md:grid-cols-3">
-        <MetricCard label="Execuções" value={workflowResult.data.pagination.total} accent="ink" />
+        <MetricCard label="Automações" value={runs.length} accent="ink" />
         <MetricCard label="Concluídas" value={completed} accent="green" />
-        <MetricCard label="Em execução" value={running} accent="blue" />
+        <MetricCard label="Em andamento" value={running} accent="blue" />
       </section>
 
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={workflowResult.offline || principal.offline} />
 
       <DataTable<WorkflowRun>
-        eyebrow="Temporal"
-        title="Execuções recentes"
+        eyebrow="Processamento"
+        title="Atividades recentes"
         rows={runs}
         columns={[
-          { key: 'workflow', label: 'Fluxo', render: (row) => row.workflow_name },
-          { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
+          { key: 'workflow', label: 'Automação', render: (row) => formatWorkflowName(row.workflow_name) },
+          { key: 'status', label: 'Situação', render: (row) => <StatusBadge value={row.status} /> },
           { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_id ?? '-' },
-          { key: 'workflow_id', label: 'ID do fluxo', render: (row) => row.workflow_id },
-          { key: 'started', label: 'Início', render: (row) => row.started_at ?? '-' },
+          { key: 'workflow_id', label: 'Referência', render: (row) => shortId(row.workflow_id) },
+          { key: 'started', label: 'Início', render: (row) => formatDateTime(row.started_at) },
         ]}
       />
     </Shell>

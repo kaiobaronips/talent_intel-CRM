@@ -5,6 +5,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
 import { getCandidates, getTenant } from '@/lib/api';
+import { formatScore } from '@/lib/format';
 import { resolveActiveTenantId } from '@/lib/session';
 import type { Candidate } from '@/lib/types';
 
@@ -20,11 +21,11 @@ export default async function CandidatesPage() {
   return (
     <Shell
       offline={tenantResult.offline || candidatesResult.offline}
-      title="Candidatos"
-      subtitle={`Base operacional da empresa ${tenantResult.data.company_name}. O score qualifica, mas não bloqueia contato.`}
+      title="Candidatos em análise"
+      subtitle={`Base de talentos da empresa ${tenantResult.data.company_name}. A nota indica aderência ao perfil buscado e ajuda a priorizar a abordagem.`}
     >
       <section className="stagger grid gap-4 md:grid-cols-3">
-        <MetricCard label="Total" value={candidatesResult.data.pagination.total} accent="ink" />
+        <MetricCard label="Total na base" value={candidates.length} accent="ink" />
         <MetricCard label="Com e-mail" value={withEmail} accent="green" />
         <MetricCard label="Com LinkedIn" value={withLinkedIn} accent="blue" />
       </section>
@@ -35,7 +36,7 @@ export default async function CandidatesPage() {
 
       <DataTable<Candidate>
         eyebrow="Talentos"
-        title="Base limpa para cadência"
+        title="Base pronta para contato"
         rows={candidates}
         columns={[
           { key: 'name', label: 'Nome', render: (row) => row.name },
@@ -45,8 +46,8 @@ export default async function CandidatesPage() {
           { key: 'role', label: 'Cargo', render: (row) => row.current_role ?? '-' },
           { key: 'company', label: 'Empresa', render: (row) => row.current_company ?? '-' },
           { key: 'seniority', label: 'Senioridade', render: (row) => row.seniority ?? '-' },
-          { key: 'score', label: 'Pontuação', render: (row) => row.score_overall ?? '-' },
-          { key: 'classification', label: 'Classificação', render: (row) => <StatusBadge value={row.classification} /> },
+          { key: 'score', label: 'Aderência', render: (row) => formatScore(row.score_overall) },
+          { key: 'classification', label: 'Prioridade', render: (row) => <StatusBadge value={row.classification} /> },
         ]}
       />
     </Shell>

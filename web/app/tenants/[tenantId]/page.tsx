@@ -4,6 +4,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
 import { getApiKeys, getCandidates, getInteractions, getTenant, getTenantMetrics } from '@/lib/api';
+import { formatScore } from '@/lib/format';
 import { getSessionToken, requireAuthenticatedPrincipal } from '@/lib/session';
 import type { ApiKey, Candidate, Interaction } from '@/lib/types';
 
@@ -31,12 +32,12 @@ export default async function TenantPage({ params }: TenantPageProps) {
   const backlogTotal = metricsResult.data.channel_backlog.reduce((sum, item) => sum + item.pending, 0);
 
   return (
-    <Shell offline={offline} title={tenant.company_name} subtitle={`Empresa ${tenant.id} | ${tenant.timezone ?? 'fuso horário não definido'} | plano ${tenant.tier ?? 'não definido'}`}>
+    <Shell offline={offline} title={tenant.company_name} subtitle={`Painel da empresa com candidatos, contatos planejados e integrações ativas.`}>
       <section className="stagger grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Status" value={tenant.status ?? 'ativo'} accent="green" />
-        <MetricCard label="Candidatos" value={candidatesResult.data.pagination.total} detail="total paginado" accent="blue" />
-        <MetricCard label="Fila" value={backlogTotal} detail="pendências por canal" accent="amber" />
-        <MetricCard label="Chaves de API" value={keysResult.data.length} detail="credenciais da empresa" accent="ink" />
+        <MetricCard label="Candidatos" value={candidatesResult.data.items.length} detail="em acompanhamento" accent="blue" />
+        <MetricCard label="Contatos pendentes" value={backlogTotal} detail="por canal" accent="amber" />
+        <MetricCard label="Integrações" value={keysResult.data.length} detail="chaves ativas ou cadastradas" accent="ink" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
@@ -47,8 +48,8 @@ export default async function TenantPage({ params }: TenantPageProps) {
       <ApiKeyLifecycleForm tenantId={tenantId} />
 
       <DataTable<ApiKey>
-        eyebrow="Seguranca"
-        title="Chaves de API da empresa"
+        eyebrow="Segurança"
+        title="Chaves de integração"
         rows={keysResult.data}
         columns={[
           { key: 'name', label: 'Nome', render: (row) => row.name },
@@ -66,15 +67,15 @@ export default async function TenantPage({ params }: TenantPageProps) {
           columns={[
             { key: 'name', label: 'Nome', render: (row) => row.name },
             { key: 'role', label: 'Cargo', render: (row) => row.current_role ?? '-' },
-            { key: 'score', label: 'Score', render: (row) => row.score_overall ?? '-' },
-            { key: 'classification', label: 'Classe', render: (row) => <StatusBadge value={row.classification} /> },
-            { key: 'stage', label: 'Etapa', render: (row) => <StatusBadge value={row.stage} /> },
+            { key: 'score', label: 'Aderência', render: (row) => formatScore(row.score_overall) },
+            { key: 'classification', label: 'Prioridade', render: (row) => <StatusBadge value={row.classification} /> },
+            { key: 'stage', label: 'Situação', render: (row) => <StatusBadge value={row.stage} /> },
           ]}
         />
 
         <DataTable<Interaction>
           eyebrow="Empresa"
-          title="Interações"
+          title="Contatos"
           rows={interactionsResult.data.items}
           columns={[
             { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_name ?? row.candidate_id },

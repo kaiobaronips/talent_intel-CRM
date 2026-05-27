@@ -5,6 +5,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
 import { getMemberships } from '@/lib/api';
+import { shortId } from '@/lib/format';
 import { resolveActiveTenantId } from '@/lib/session';
 import type { TenantMembership } from '@/lib/types';
 
@@ -17,7 +18,7 @@ export default async function MembersPage() {
   const admins = memberships.filter((membership) => ['owner', 'admin'].includes(membership.role)).length;
 
   return (
-    <Shell offline={membershipsResult.offline || principal.offline} title="Membros da empresa" subtitle="Controle inicial de acesso SaaS por empresa. O login humano será conectado a estas associações.">
+    <Shell offline={membershipsResult.offline || principal.offline} title="Equipe e permissões" subtitle="Controle quem pode acessar os dados da empresa e qual nível de permissão cada pessoa possui.">
       <section className="stagger grid gap-4 md:grid-cols-3">
         <MetricCard label="Membros" value={memberships.length} accent="ink" />
         <MetricCard label="Administradores" value={admins} accent="amber" />
@@ -35,8 +36,8 @@ export default async function MembersPage() {
         title="Membros cadastrados"
         rows={memberships}
         columns={[
-          { key: 'id', label: 'ID', render: (row) => row.id },
-          { key: 'user', label: 'ID do usuário', render: (row) => row.user_id },
+          { key: 'id', label: 'Referência', render: (row) => shortId(row.id) },
+          { key: 'user', label: 'Usuário', render: (row) => shortId(row.user_id) },
           { key: 'email', label: 'E-mail', render: (row) => row.email ?? '-' },
           { key: 'role', label: 'Papel', render: (row) => <StatusBadge value={row.role} /> },
           { key: 'actions', label: 'Ações', render: (row) => <MembershipRemoveButton tenantId={tenantId} membershipId={row.id} label={row.email || row.user_id} /> },
