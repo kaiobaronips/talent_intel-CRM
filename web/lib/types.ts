@@ -22,6 +22,9 @@ export type Candidate = {
   target_profile?: string | null;
   seniority?: string | null;
   classification?: string | null;
+  classification_reason?: string | null;
+  profile_summary?: string | null;
+  recommended_action?: string | null;
   score_overall?: number | null;
   stage?: string | null;
   created_at?: string;

@@ -24,11 +24,23 @@ def _candidate_sources(payload: dict[str, Any]) -> list[str]:
 
 
 def _dry_enrichment(payload: dict[str, Any]) -> dict[str, Any]:
+    role = _clean_text(payload.get("current_role") or payload.get("role"))
+    company = _clean_text(payload.get("current_company") or payload.get("company"))
+    seniority = _clean_text(payload.get("seniority"))
+    summary_parts = []
+    if role:
+        summary_parts.append(role)
+    if company:
+        summary_parts.append(f"atual em {company}")
+    if seniority:
+        summary_parts.append(f"senioridade {seniority}")
+
     return {
         "enrichment_status": "dry_run",
-        "current_role": _clean_text(payload.get("current_role") or payload.get("role")),
-        "current_company": _clean_text(payload.get("current_company") or payload.get("company")),
-        "seniority": _clean_text(payload.get("seniority")),
+        "current_role": role,
+        "current_company": company,
+        "seniority": seniority,
+        "profile_summary": ", ".join(summary_parts) if summary_parts else "Perfil aguardando enriquecimento externo.",
         "profile_sources": _candidate_sources(payload),
         "contactability": {
             "email": bool(_clean_text(payload.get("email"))),
@@ -56,11 +68,23 @@ def _dry_classification(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         classification = "C"
 
+    reasons = []
+    if _clean_text(payload.get("linkedin_url")):
+        reasons.append("perfil de LinkedIn disponível")
+    if _clean_text(payload.get("email")):
+        reasons.append("e-mail disponível")
+    if _clean_text(payload.get("current_role")):
+        reasons.append("cargo atual informado")
+    if _clean_text(payload.get("target_profile")):
+        reasons.append("perfil alvo informado")
+    reason_text = "Aderência calculada com base em " + ", ".join(reasons) + "." if reasons else "Aderência inicial calculada com poucos dados disponíveis."
+
     return {
         "classification_status": "dry_run",
         "score_overall": score,
         "classification": classification,
-        "classification_reason": "Score informativo baseado em completude de perfil e canais disponiveis.",
+        "classification_reason": reason_text,
+        "recommended_action": "Priorizar abordagem consultiva e validar interesse em uma conversa curta.",
         "score_mode": "informational_only",
     }
 
@@ -72,16 +96,16 @@ def _dry_message(payload: dict[str, Any]) -> dict[str, Any]:
 
     if channel == "linkedin":
         text = (
-            f"Ola {name}, vi {role} e acredito que pode haver uma oportunidade aderente ao seu momento. "
+            f"Olá {name}, vi sua atuação como {role} e acredito que pode haver uma oportunidade aderente ao seu momento. "
             "Podemos conversar rapidamente esta semana?"
         )
         return {"text": text, "language": "pt-BR", "template_status": "dry_run"}
 
     subject = f"Conversa sobre oportunidade para {name}"
     body = (
-        f"Ola {name},\n\n"
-        f"Analisei {role} e gostaria de apresentar uma oportunidade que pode fazer sentido para voce. "
-        "Podemos agendar uma conversa rapida esta semana?\n\n"
+        f"Olá {name},\n\n"
+        f"Analisei sua atuação como {role} e gostaria de apresentar uma oportunidade que pode fazer sentido para você. "
+        "Podemos agendar uma conversa rápida esta semana?\n\n"
         "Obrigado."
     )
     return {"subject": subject, "body": body, "language": "pt-BR", "template_status": "dry_run"}

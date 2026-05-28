@@ -80,8 +80,16 @@ export default async function CandidateDetailPage({ params }: CandidateDetailPag
             </div>
           </div>
           <div className="mt-3 rounded-lg bg-stone-50 p-4">
-            <p className="text-xs font-bold uppercase text-stone-500">Perfil buscado</p>
-            <p className="mt-2 font-medium leading-7 text-stone-700">{cleanValue(candidate.target_profile)}</p>
+            <p className="text-xs font-bold uppercase text-stone-500">Leitura dos agentes</p>
+            <p className="mt-2 font-medium leading-7 text-stone-700">{cleanValue(candidate.profile_summary)}</p>
+          </div>
+          <div className="mt-3 rounded-lg bg-stone-50 p-4">
+            <p className="text-xs font-bold uppercase text-stone-500">Por que recebeu esta prioridade</p>
+            <p className="mt-2 font-medium leading-7 text-stone-700">{cleanValue(candidate.classification_reason)}</p>
+          </div>
+          <div className="mt-3 rounded-lg bg-stone-50 p-4">
+            <p className="text-xs font-bold uppercase text-stone-500">Recomendação de abordagem</p>
+            <p className="mt-2 font-medium leading-7 text-stone-700">{cleanValue(candidate.recommended_action)}</p>
           </div>
         </article>
 
@@ -117,6 +125,7 @@ export default async function CandidateDetailPage({ params }: CandidateDetailPag
           { key: 'status', label: 'Situação', render: (row) => <StatusBadge value={row.status ?? row.interaction_status} /> },
           { key: 'type', label: 'Tipo', render: (row) => cleanValue(row.message_type) },
           { key: 'next', label: 'Próxima ação', render: (row) => cleanValue(row.next_action) },
+          { key: 'message', label: 'Mensagem preparada', render: (row) => cleanValue(row.message_sent) },
           { key: 'created', label: 'Criado em', render: (row) => formatDateTime(row.created_at) },
         ]}
       />

@@ -123,7 +123,14 @@ def test_read_routes_return_projected_records(monkeypatch) -> None:
     monkeypatch.setattr(
         api,
         "list_candidate_interactions",
-        lambda candidate_id: [{"candidate_id": candidate_id, "channel": "email"}],
+        lambda candidate_id: [
+            {
+                "candidate_id": candidate_id,
+                "channel": "email",
+                "status": "pending",
+                "payload_json": {"name": "Candidate One", "message": {"body": "Mensagem preparada"}},
+            }
+        ],
     )
     client = TestClient(api.app)
 
@@ -133,7 +140,11 @@ def test_read_routes_return_projected_records(monkeypatch) -> None:
 
     assert tenant.status_code == 200
     assert candidate.json()["data"]["stage"] == "contacted"
-    assert interactions.json()["data"]["items"] == [{"candidate_id": "candidate-001", "channel": "email"}]
+    interaction = interactions.json()["data"]["items"][0]
+    assert interaction["candidate_id"] == "candidate-001"
+    assert interaction["candidate_name"] == "Candidate One"
+    assert interaction["interaction_status"] == "pending"
+    assert interaction["message_sent"] == "Mensagem preparada"
 
 
 def test_candidate_routes_flatten_agent_metadata(monkeypatch) -> None:
@@ -333,7 +344,14 @@ def test_mutating_routes_append_audit_events(monkeypatch) -> None:
 def test_tenant_pagination_and_metrics_routes(monkeypatch) -> None:
     monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
     monkeypatch.setattr(api, "list_tenant_candidates", lambda _tenant_id, _page, _limit: {"items": [{"id": "cand-1"}], "total": 11})
-    monkeypatch.setattr(api, "list_tenant_interactions", lambda _tenant_id, _page, _limit: {"items": [{"id": "int-1"}], "total": 1})
+    monkeypatch.setattr(
+        api,
+        "list_tenant_interactions",
+        lambda _tenant_id, _page, _limit: {
+            "items": [{"id": "int-1", "channel": "linkedin", "payload_json": {"name": "Candidate One", "message": {"text": "Convite preparado"}}}],
+            "total": 1,
+        },
+    )
     monkeypatch.setattr(api, "list_tenant_audit_events", lambda _tenant_id, _page, _limit: {"items": [{"id": "audit-1"}], "total": 1})
     monkeypatch.setattr(api, "list_tenant_workflow_runs", lambda _tenant_id, _page, _limit: {"items": [{"id": "run-1"}], "total": 1})
     monkeypatch.setattr(
@@ -354,7 +372,8 @@ def test_tenant_pagination_and_metrics_routes(monkeypatch) -> None:
     metrics = client.get("/v1/tenants/tenant-001/metrics")
 
     assert candidates.json()["data"]["pagination"] == {"page": 2, "limit": 10, "total": 11, "pages": 2}
-    assert interactions.json()["data"]["items"] == [{"id": "int-1"}]
+    assert interactions.json()["data"]["items"][0]["candidate_name"] == "Candidate One"
+    assert interactions.json()["data"]["items"][0]["message_sent"] == "Convite preparado"
     assert workflows.json()["data"]["items"] == [{"id": "run-1"}]
     assert audit.json()["data"]["items"] == [{"id": "audit-1"}]
     assert metrics.json()["data"]["channel_backlog"] == [{"channel": "email", "pending": 1}]

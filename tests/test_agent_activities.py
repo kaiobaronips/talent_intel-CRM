@@ -30,7 +30,10 @@ def test_agent_activities_return_dry_run_payloads(monkeypatch) -> None:
     assert search["executed"] is False
     assert search["result"]["search_status"] == "dry_run"
     assert enrichment["result"]["enrichment"]["contactability"] == {"email": True, "linkedin": True}
+    assert enrichment["result"]["enrichment"]["profile_summary"] == "Account Executive"
     assert classification["result"]["classification"]["classification"] == "A"
+    assert "classification_reason" in classification["result"]["classification"]
+    assert "recommended_action" in classification["result"]["classification"]
     assert message["result"]["message"]["subject"] == "Conversa sobre oportunidade para Candidate One"
 
 

@@ -143,6 +143,52 @@ def _candidate_projection(candidate: Dict[str, Any]) -> Dict[str, Any]:
     return projected
 
 
+def _message_preview(message: Any) -> str:
+    if isinstance(message, str):
+        return message.strip()
+    if not isinstance(message, dict):
+        return ""
+    text = message.get("text")
+    if isinstance(text, str) and text.strip():
+        return text.strip()
+    body = message.get("body")
+    if isinstance(body, str) and body.strip():
+        return body.strip()
+    subject = message.get("subject")
+    if isinstance(subject, str):
+        return subject.strip()
+    return ""
+
+
+def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
+    payload = interaction.get("payload_json") or {}
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except json.JSONDecodeError:
+            payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    message = payload.get("message") if isinstance(payload.get("message"), dict) else {}
+    status_value = interaction.get("status") or payload.get("status") or "pending"
+    candidate_name = payload.get("name") or interaction.get("candidate_name")
+    message_sent = _message_preview(message) or _message_preview(payload.get("message_sent"))
+    next_action = payload.get("next_action")
+    if not next_action:
+        channel = interaction.get("channel")
+        next_action = "Enviar mensagem pelo LinkedIn" if channel == "linkedin" else "Enviar e-mail inicial"
+
+    projected = {**payload, **interaction}
+    projected["payload_json"] = payload
+    projected["candidate_name"] = candidate_name
+    projected["interaction_status"] = status_value
+    projected["status"] = status_value
+    projected["message_sent"] = message_sent
+    projected["next_action"] = next_action
+    return projected
+
+
 def _record_audit_event(
     *,
     tenant_id: str,
@@ -524,7 +570,7 @@ async def read_candidate_interactions(candidate_id: str, principal: APIPrincipal
     return _success(
         {
             "candidate_id": candidate_id,
-            "items": list_candidate_interactions(candidate_id),
+            "items": [_interaction_projection(interaction) for interaction in list_candidate_interactions(candidate_id)],
         }
     )
 
@@ -540,7 +586,8 @@ async def read_tenant_interactions(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     authorize_tenant(principal, tenant_id)
     result = list_tenant_interactions(tenant_id, page, limit)
-    return _success({"tenant_id": tenant_id, **_page(result["items"], page, limit, result["total"])})
+    items = [_interaction_projection(interaction) for interaction in result["items"]]
+    return _success({"tenant_id": tenant_id, **_page(items, page, limit, result["total"])})
 
 
 @app.get("/v1/tenants/{tenant_id}/workflow-runs")
