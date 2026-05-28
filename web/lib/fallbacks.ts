@@ -71,6 +71,13 @@ export const fallbackInteractions: Paginated<Interaction> = {
   pagination: { page: 1, limit: 20, total: 2, pages: 1 },
 };
 
+export const fallbackCandidate: Candidate = fallbackCandidates.items[0];
+
+export const fallbackCandidateInteractions = {
+  candidate_id: fallbackCandidate.id,
+  items: fallbackInteractions.items.filter((interaction) => interaction.candidate_id === fallbackCandidate.id),
+};
+
 export const fallbackMetrics: TenantMetrics = {
   workflow_runs: { completed: 2, running: 0, failed: 0, total: 2 },
   interaction_counts: [

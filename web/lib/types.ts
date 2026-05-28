@@ -33,10 +33,13 @@ export type Interaction = {
   candidate_id: string;
   candidate_name?: string | null;
   channel: 'email' | 'linkedin' | string;
+  message_type?: string | null;
+  status?: string | null;
   interaction_status?: string | null;
   next_action?: string | null;
   message_sent?: string | null;
   response_received?: string | null;
+  payload_json?: Record<string, unknown> | null;
   scheduled_at?: string | null;
   sent_at?: string | null;
   created_at?: string;

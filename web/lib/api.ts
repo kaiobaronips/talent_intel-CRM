@@ -1,4 +1,4 @@
-import { defaultTenantId, fallbackApiKeys, fallbackAuditEvents, fallbackCandidates, fallbackInteractions, fallbackMemberships, fallbackMetrics, fallbackTenant, fallbackTenants, fallbackWorkflowRuns } from './fallbacks';
+import { defaultTenantId, fallbackApiKeys, fallbackAuditEvents, fallbackCandidate, fallbackCandidateInteractions, fallbackCandidates, fallbackInteractions, fallbackMemberships, fallbackMetrics, fallbackTenant, fallbackTenants, fallbackWorkflowRuns } from './fallbacks';
 import type { ApiKey, ApiResult, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMembership, TenantMetrics, WorkflowRun } from './types';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_TICRM_API_URL ?? 'http://localhost:8000';
@@ -26,6 +26,11 @@ type ApiKeysPayload = {
 type MembershipsPayload = {
   tenant_id: string;
   items: TenantMembership[];
+};
+
+type CandidateInteractionsPayload = {
+  candidate_id: string;
+  items: Interaction[];
 };
 
 type ApiAuthOptions = {
@@ -148,8 +153,17 @@ export async function getCandidates(tenantId = defaultTenantId, limit = 20, opti
   return apiGetRaw<Paginated<Candidate>>(`/v1/tenants/${tenantId}/candidates?page=1&limit=${limit}`, fallbackCandidates, options);
 }
 
+export async function getCandidate(candidateId: string, options: ApiAuthOptions = {}): Promise<ApiResult<Candidate>> {
+  return apiGetRaw<Candidate>(`/v1/candidates/${candidateId}`, fallbackCandidate, options);
+}
+
 export async function getInteractions(tenantId = defaultTenantId, limit = 20, options: ApiAuthOptions = {}): Promise<ApiResult<Paginated<Interaction>>> {
   return apiGetRaw<Paginated<Interaction>>(`/v1/tenants/${tenantId}/interactions?page=1&limit=${limit}`, fallbackInteractions, options);
+}
+
+export async function getCandidateInteractions(candidateId: string, options: ApiAuthOptions = {}): Promise<ApiResult<Interaction[]>> {
+  const result = await apiGetRaw<CandidateInteractionsPayload>(`/v1/candidates/${candidateId}/interactions`, fallbackCandidateInteractions, options);
+  return { data: result.data.items, offline: result.offline, status: result.status, message: result.message };
 }
 
 export async function getMemberships(tenantId = defaultTenantId, options: ApiAuthOptions = {}): Promise<ApiResult<TenantMembership[]>> {

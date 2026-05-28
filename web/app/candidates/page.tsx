@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { CandidateCreateForm } from '@/components/ActionForms';
 import { ContextPanel } from '@/components/ContextPanel';
 import { DataTable } from '@/components/DataTable';
@@ -39,7 +40,7 @@ export default async function CandidatesPage() {
         title="Base pronta para contato"
         rows={candidates}
         columns={[
-          { key: 'name', label: 'Nome', render: (row) => row.name },
+          { key: 'name', label: 'Nome', render: (row) => <Link href={`/candidates/${row.id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.name}</Link> },
           { key: 'location', label: 'Local', render: (row) => [row.city, row.state].filter(Boolean).join(' / ') || 'Não informado' },
           { key: 'email', label: 'E-mail', render: (row) => row.email ?? '-' },
           { key: 'linkedin', label: 'LinkedIn', render: (row) => (row.linkedin_url ? 'Disponível' : '-') },

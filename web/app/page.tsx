@@ -54,7 +54,7 @@ export default async function DashboardPage() {
           title="Candidatos em acompanhamento"
           rows={candidates}
           columns={[
-            { key: 'name', label: 'Nome', render: (row) => row.name },
+            { key: 'name', label: 'Nome', render: (row) => <Link href={`/candidates/${row.id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.name}</Link> },
             { key: 'role', label: 'Cargo', render: (row) => row.current_role ?? 'Não informado' },
             { key: 'score', label: 'Aderência', render: (row) => formatScore(row.score_overall) },
             { key: 'stage', label: 'Situação', render: (row) => <StatusBadge value={row.stage} /> },
@@ -88,7 +88,7 @@ export default async function DashboardPage() {
         title="Próximas abordagens"
         rows={interactions}
         columns={[
-          { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_name ?? row.candidate_id },
+          { key: 'candidate', label: 'Candidato', render: (row) => <Link href={`/candidates/${row.candidate_id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.candidate_name ?? row.candidate_id}</Link> },
           { key: 'channel', label: 'Canal', render: (row) => <StatusBadge value={row.channel} /> },
           { key: 'status', label: 'Situação', render: (row) => <StatusBadge value={row.interaction_status} /> },
           { key: 'next', label: 'Próxima ação', render: (row) => row.next_action ?? '-' },

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ApiKeyCreateForm, ApiKeyLifecycleForm, CandidateCreateForm } from '@/components/ActionForms';
 import { DataTable } from '@/components/DataTable';
 import { MetricCard } from '@/components/MetricCard';
@@ -65,7 +66,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
           title="Candidatos"
           rows={candidatesResult.data.items}
           columns={[
-            { key: 'name', label: 'Nome', render: (row) => row.name },
+            { key: 'name', label: 'Nome', render: (row) => <Link href={`/candidates/${row.id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.name}</Link> },
             { key: 'role', label: 'Cargo', render: (row) => row.current_role ?? '-' },
             { key: 'score', label: 'Aderência', render: (row) => formatScore(row.score_overall) },
             { key: 'classification', label: 'Prioridade', render: (row) => <StatusBadge value={row.classification} /> },
@@ -78,7 +79,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
           title="Contatos"
           rows={interactionsResult.data.items}
           columns={[
-            { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_name ?? row.candidate_id },
+            { key: 'candidate', label: 'Candidato', render: (row) => <Link href={`/candidates/${row.candidate_id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.candidate_name ?? row.candidate_id}</Link> },
             { key: 'channel', label: 'Canal', render: (row) => <StatusBadge value={row.channel} /> },
             { key: 'next', label: 'Próxima', render: (row) => row.next_action ?? '-' },
           ]}

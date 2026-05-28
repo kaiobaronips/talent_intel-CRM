@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ContextPanel } from '@/components/ContextPanel';
 import { DataTable } from '@/components/DataTable';
 import { MetricCard } from '@/components/MetricCard';
@@ -32,7 +33,7 @@ export default async function InteractionsPage() {
         title="Abordagens planejadas"
         rows={interactions}
         columns={[
-          { key: 'candidate', label: 'Candidato', render: (row) => row.candidate_name ?? row.candidate_id },
+          { key: 'candidate', label: 'Candidato', render: (row) => <Link href={`/candidates/${row.candidate_id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.candidate_name ?? row.candidate_id}</Link> },
           { key: 'channel', label: 'Canal', render: (row) => <StatusBadge value={row.channel} /> },
           { key: 'interaction', label: 'Situação', render: (row) => <StatusBadge value={row.interaction_status} /> },
           { key: 'next', label: 'Próxima ação', render: (row) => <StatusBadge value={row.next_action} /> },
