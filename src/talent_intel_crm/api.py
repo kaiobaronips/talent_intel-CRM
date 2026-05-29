@@ -19,6 +19,7 @@ from talent_intel_crm.db import (
     delete_tenant_membership,
     find_auth_user_by_email,
     get_candidate,
+    get_interaction,
     get_tenant,
     insert_tenant_api_key,
     list_candidate_interactions,
@@ -32,6 +33,7 @@ from talent_intel_crm.db import (
     revoke_tenant_api_key,
     tenant_exists,
     tenant_metrics,
+    update_interaction_status,
     upsert_tenant_membership,
 )
 from talent_intel_crm.domain import CandidateChannel, CandidateStage, TenantTier
@@ -97,6 +99,11 @@ class TenantMembershipUpsertRequest(BaseModel):
 
 class TenantAPIKeyCreateRequest(BaseModel):
     label: str = Field(default="default", min_length=1, max_length=120)
+
+
+class InteractionStatusUpdateRequest(BaseModel):
+    status: str = Field(pattern="^(pending|sent|replied|closed)$")
+    response_received: str = Field(default="", max_length=2000)
 
 
 def _success(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -185,6 +192,7 @@ def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
     projected["interaction_status"] = status_value
     projected["status"] = status_value
     projected["message_sent"] = message_sent
+    projected["response_received"] = payload.get("response_received") or interaction.get("response_received")
     projected["next_action"] = next_action
     return projected
 
@@ -588,6 +596,26 @@ async def read_tenant_interactions(
     result = list_tenant_interactions(tenant_id, page, limit)
     items = [_interaction_projection(interaction) for interaction in result["items"]]
     return _success({"tenant_id": tenant_id, **_page(items, page, limit, result["total"])})
+
+
+@app.post("/v1/interactions/{interaction_id}/status")
+async def update_interaction_status_route(
+    interaction_id: str,
+    payload: InteractionStatusUpdateRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    interaction = get_interaction(interaction_id)
+    if not interaction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
+    authorize_tenant(principal, interaction["tenant_id"])
+
+    payload_updates: Dict[str, Any] = {}
+    if payload.response_received:
+        payload_updates["response_received"] = payload.response_received
+    updated = update_interaction_status(interaction_id, payload.status, payload_updates)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
+    return _success({"interaction": _interaction_projection(updated)})
 
 
 @app.get("/v1/tenants/{tenant_id}/workflow-runs")

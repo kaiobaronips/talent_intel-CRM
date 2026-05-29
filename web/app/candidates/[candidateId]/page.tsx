@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { DataTable } from '@/components/DataTable';
+import { InteractionStatusForms } from '@/components/InteractionStatusForms';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -24,7 +25,7 @@ function channelLabel(channel: string) {
 
 export default async function CandidateDetailPage({ params }: CandidateDetailPageProps) {
   const { candidateId } = await params;
-  const { authOptions } = await resolveActiveTenantId();
+  const { tenantId, authOptions } = await resolveActiveTenantId();
   const [candidateResult, interactionsResult] = await Promise.all([
     getCandidate(candidateId, authOptions),
     getCandidateInteractions(candidateId, authOptions),
@@ -127,6 +128,7 @@ export default async function CandidateDetailPage({ params }: CandidateDetailPag
           { key: 'next', label: 'Próxima ação', render: (row) => cleanValue(row.next_action) },
           { key: 'message', label: 'Mensagem preparada', render: (row) => cleanValue(row.message_sent) },
           { key: 'created', label: 'Criado em', render: (row) => formatDateTime(row.created_at) },
+          { key: 'actions', label: 'Ações', render: (row) => <InteractionStatusForms interaction={row} tenantId={tenantId} /> },
         ]}
       />
     </Shell>

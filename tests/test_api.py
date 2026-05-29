@@ -377,3 +377,42 @@ def test_tenant_pagination_and_metrics_routes(monkeypatch) -> None:
     assert workflows.json()["data"]["items"] == [{"id": "run-1"}]
     assert audit.json()["data"]["items"] == [{"id": "audit-1"}]
     assert metrics.json()["data"]["channel_backlog"] == [{"channel": "email", "pending": 1}]
+
+
+def test_update_interaction_status_route(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api,
+        "get_interaction",
+        lambda interaction_id: {
+            "id": interaction_id,
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "channel": "email",
+            "status": "pending",
+            "payload_json": {"name": "Candidate One"},
+        },
+    )
+
+    def update(interaction_id, status, payload_updates):
+        return {
+            "id": interaction_id,
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "channel": "email",
+            "status": status,
+            "payload_json": {"name": "Candidate One", **payload_updates},
+        }
+
+    monkeypatch.setattr(api, "update_interaction_status", update)
+    client = TestClient(api.app)
+
+    response = client.post(
+        "/v1/interactions/interaction-001/status",
+        json={"status": "replied", "response_received": "Tenho interesse."},
+    )
+
+    assert response.status_code == 200
+    interaction = response.json()["data"]["interaction"]
+    assert interaction["status"] == "replied"
+    assert interaction["interaction_status"] == "replied"
+    assert interaction["response_received"] == "Tenho interesse."

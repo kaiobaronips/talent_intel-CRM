@@ -1,5 +1,5 @@
 import { defaultTenantId, fallbackApiKeys, fallbackAuditEvents, fallbackCandidate, fallbackCandidateInteractions, fallbackCandidates, fallbackInteractions, fallbackMemberships, fallbackMetrics, fallbackTenant, fallbackTenants, fallbackWorkflowRuns } from './fallbacks';
-import type { ApiKey, ApiResult, AuditEvent, Candidate, Interaction, Paginated, Tenant, TenantMembership, TenantMetrics, WorkflowRun } from './types';
+import type { ApiKey, ApiResult, AuditEvent, Candidate, Interaction, InteractionStatus, Paginated, Tenant, TenantMembership, TenantMetrics, WorkflowRun } from './types';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_TICRM_API_URL ?? 'http://localhost:8000';
 const apiKey = process.env.TICRM_API_KEY;
@@ -164,6 +164,18 @@ export async function getInteractions(tenantId = defaultTenantId, limit = 20, op
 export async function getCandidateInteractions(candidateId: string, options: ApiAuthOptions = {}): Promise<ApiResult<Interaction[]>> {
   const result = await apiGetRaw<CandidateInteractionsPayload>(`/v1/candidates/${candidateId}/interactions`, fallbackCandidateInteractions, options);
   return { data: result.data.items, offline: result.offline, status: result.status, message: result.message };
+}
+
+export async function updateInteractionStatus(
+  interactionId: string,
+  status: InteractionStatus,
+  responseReceived = '',
+  options: ApiAuthOptions = {},
+): Promise<ApiMutationResult<{ interaction: Interaction }>> {
+  return apiMutation<{ interaction: Interaction }>(`/v1/interactions/${interactionId}/status`, 'POST', {
+    status,
+    response_received: responseReceived,
+  }, options);
 }
 
 export async function getMemberships(tenantId = defaultTenantId, options: ApiAuthOptions = {}): Promise<ApiResult<TenantMembership[]>> {

@@ -48,6 +48,8 @@ export type Interaction = {
   created_at?: string;
 };
 
+export type InteractionStatus = 'pending' | 'sent' | 'replied' | 'closed';
+
 export type ApiKey = {
   id: string;
   name: string;

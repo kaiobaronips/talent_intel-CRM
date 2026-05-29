@@ -371,6 +371,48 @@ def list_tenant_interactions(tenant_id: str, page: int, limit: int) -> dict[str,
             return {"items": [dict(row) for row in cur.fetchall()], "total": total}
 
 
+def get_interaction(interaction_id: str) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select id, tenant_id, candidate_id, channel, message_type, status, provider_message_id,
+                    provider_thread_id, idempotency_key, payload_json, created_at
+                from interactions
+                where id::text = %s
+                """,
+                (interaction_id,),
+            )
+            return dict(cur.fetchone() or {})
+
+
+def update_interaction_status(interaction_id: str, status: str, payload_updates: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload_updates = payload_updates or {}
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute("select payload_json from interactions where id::text = %s", (interaction_id,))
+            existing = cur.fetchone()
+            if not existing:
+                return {}
+            payload = existing.get("payload_json") or {}
+            if not isinstance(payload, dict):
+                payload = {}
+            payload.update(payload_updates)
+            payload["status"] = status
+            cur.execute(
+                """
+                update interactions
+                set status = %s,
+                    payload_json = %s::jsonb
+                where id::text = %s
+                returning id, tenant_id, candidate_id, channel, message_type, status, provider_message_id,
+                    provider_thread_id, idempotency_key, payload_json, created_at
+                """,
+                (status, json.dumps(payload, ensure_ascii=False), interaction_id),
+            )
+            return dict(cur.fetchone() or {})
+
+
 def tenant_metrics(tenant_id: str) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:

@@ -5,6 +5,8 @@ const statusLabels: Record<string, string> = {
   connected: 'Conectado',
   ready: 'Pronto',
   pending: 'Aguardando contato',
+  sent: 'Mensagem enviada',
+  replied: 'Resposta recebida',
   starter: 'Inicial',
   growth: 'Crescimento',
   scale: 'Escala',

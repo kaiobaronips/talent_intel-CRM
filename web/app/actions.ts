@@ -3,7 +3,8 @@
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiMutation, getDefaultTenantId } from '@/lib/api';
+import { apiMutation, getDefaultTenantId, updateInteractionStatus } from '@/lib/api';
+import type { InteractionStatus } from '@/lib/types';
 import { getSessionToken, refreshCookieName, sessionCookieName } from '@/lib/session';
 import { authErrorMessage, requireSupabaseAuthConfig, revokeSupabaseSession, setSessionCookie, type SupabaseTokenPayload } from '@/lib/supabase-auth';
 
@@ -24,6 +25,11 @@ function revalidateTenantViews(tenantId: string) {
   revalidatePath('/candidates');
   revalidatePath('/interactions');
   revalidatePath(`/tenants/${tenantId}`);
+}
+
+function revalidateInteractionViews(tenantId: string, candidateId: string) {
+  revalidateTenantViews(tenantId);
+  revalidatePath(`/candidates/${candidateId}`);
 }
 
 async function authOptions() {
@@ -245,4 +251,25 @@ export async function deleteMembershipAction(_previousState: ActionState, formDa
   revalidatePath('/members');
   revalidatePath(`/tenants/${tenantId}`);
   return { ok: true, message: `Membro ${membershipId} removido.` };
+}
+
+export async function updateInteractionStatusAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const candidateId = text(formData, 'candidate_id');
+  const interactionId = text(formData, 'interaction_id');
+  const status = text(formData, 'status') as InteractionStatus;
+  const responseReceived = text(formData, 'response_received');
+
+  if (!interactionId || !candidateId || !status) {
+    return { ...initialError, message: 'Contato inválido para atualização.' };
+  }
+
+  const result = await updateInteractionStatus(interactionId, status, responseReceived, await authOptions());
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateInteractionViews(tenantId, candidateId);
+  const label = status === 'sent' ? 'Mensagem marcada como enviada.' : status === 'replied' ? 'Resposta registrada.' : 'Contato atualizado.';
+  return { ok: true, message: label };
 }
