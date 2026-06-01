@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { CandidateCreateForm } from '@/components/ActionForms';
+import { CandidateTalentCards } from '@/components/CandidateTalentCards';
 import { ContextPanel } from '@/components/ContextPanel';
 import { DataTable } from '@/components/DataTable';
 import { MetricCard } from '@/components/MetricCard';
@@ -16,28 +17,33 @@ export default async function CandidatesPage() {
   const { tenantId, principal, authOptions } = await resolveActiveTenantId();
   const [tenantResult, candidatesResult] = await Promise.all([getTenant(tenantId, authOptions), getCandidates(tenantId, 50, authOptions)]);
   const candidates = candidatesResult.data.items;
+  const candidatesTotal = candidatesResult.data.pagination.total;
   const withEmail = candidates.filter((candidate) => Boolean(candidate.email)).length;
   const withLinkedIn = candidates.filter((candidate) => Boolean(candidate.linkedin_url)).length;
+  const highPriority = candidates.filter((candidate) => (candidate.classification ?? '').toLowerCase() === 'a' || (candidate.score_overall ?? 0) >= 80).length;
 
   return (
     <Shell
       offline={tenantResult.offline || candidatesResult.offline}
-      title="Candidatos em análise"
-      subtitle={`Base de talentos da empresa ${tenantResult.data.company_name}. A nota indica aderência ao perfil buscado e ajuda a priorizar a abordagem.`}
+      title="Central de candidatos"
+      subtitle={`Base de talentos da empresa ${tenantResult.data.company_name}. Use esta tela para comparar perfis, priorizar abordagens e abrir a análise completa de cada candidato.`}
     >
-      <section className="stagger grid gap-4 md:grid-cols-3">
-        <MetricCard label="Total na base" value={candidates.length} accent="ink" />
+      <section className="stagger grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Total na base" value={candidatesTotal} detail="candidatos monitorados" accent="ink" />
+        <MetricCard label="Alta prioridade" value={highPriority} detail="para abordagem" accent="amber" />
         <MetricCard label="Com e-mail" value={withEmail} accent="green" />
         <MetricCard label="Com LinkedIn" value={withLinkedIn} accent="blue" />
       </section>
 
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={tenantResult.offline || candidatesResult.offline || principal.offline} />
 
+      <CandidateTalentCards candidates={candidates} />
+
       <CandidateCreateForm tenantId={tenantId} />
 
       <DataTable<Candidate>
-        eyebrow="Talentos"
-        title="Base pronta para contato"
+        eyebrow="Registro completo"
+        title="Tabela da base de candidatos"
         rows={candidates}
         columns={[
           { key: 'name', label: 'Nome', render: (row) => <Link href={`/candidates/${row.id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.name}</Link> },

@@ -78,10 +78,13 @@ export function CandidateCreateForm({ tenantId }: { tenantId: string }) {
   return (
     <form action={action} className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
       <input type="hidden" name="tenant_id" value={tenantId} />
-      <p className="text-xs font-bold uppercase text-amber-700">Novo talento</p>
-      <h2 className="mt-2 font-display text-2xl font-black">Analisar candidato com IA</h2>
+      <p className="text-xs font-bold uppercase text-amber-700">Novo candidato</p>
+      <h2 className="mt-2 font-display text-2xl font-black">Enviar perfil para análise dos agentes</h2>
+      <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-stone-600">
+        Informe os dados disponíveis. Os agentes avaliam aderência, preparam mensagens de abordagem e criam os próximos contatos por canal.
+      </p>
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Field label="Nome" name="name" placeholder="Nome Sobrenome" required />
+        <Field label="Nome do candidato" name="name" placeholder="Nome Sobrenome" required />
         <Field label="Código interno opcional" name="candidate_id" placeholder="joao-silva-001" />
         <Field label="Cidade" name="city" placeholder="Sao Paulo" />
         <Field label="Estado" name="state" placeholder="SP" />
@@ -93,7 +96,7 @@ export function CandidateCreateForm({ tenantId }: { tenantId: string }) {
         <Field label="Perfil alvo" name="target_profile" placeholder="Vendas B2B, tecnologia, financeiro" />
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <SubmitButton>Iniciar análise com IA</SubmitButton>
+        <SubmitButton>Iniciar análise dos agentes</SubmitButton>
         <ActionFeedback state={state} />
       </div>
     </form>
