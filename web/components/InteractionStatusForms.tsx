@@ -18,7 +18,9 @@ function StatusButton({
   label,
 }: InteractionStatusFormsProps & { status: InteractionStatus; label: string }) {
   const [state, action, pending] = useActionState(updateInteractionStatusAction, initialState);
-  const disabled = pending || interaction.status === status || interaction.interaction_status === status;
+  const currentStatus = interaction.status ?? interaction.interaction_status;
+  const canSend = currentStatus === 'approved' || currentStatus === 'sent' || currentStatus === 'replied';
+  const disabled = pending || currentStatus === status || (status === 'sent' && !canSend);
 
   return (
     <form action={action} className="grid gap-2">
@@ -32,7 +34,7 @@ function StatusButton({
         disabled={disabled}
         className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-black text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {pending ? 'Salvando...' : label}
+        {pending ? 'Salvando...' : status === 'sent' && !canSend ? 'Aprove antes de enviar' : label}
       </button>
       {state.message ? (
         <p className={`max-w-48 rounded-lg border px-3 py-2 text-xs font-bold ${state.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}>

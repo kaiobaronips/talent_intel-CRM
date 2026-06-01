@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CandidateDecisionForm } from '@/components/CandidateDecisionForm';
 import { CandidateJourney } from '@/components/CandidateJourney';
 import { DataTable } from '@/components/DataTable';
 import { InteractionContactCards } from '@/components/InteractionContactCards';
@@ -118,6 +119,8 @@ export default async function CandidateDetailPage({ params }: CandidateDetailPag
           </div>
         </article>
       </section>
+
+      <CandidateDecisionForm candidate={candidate} tenantId={tenantId} />
 
       <InteractionContactCards interactions={interactions} tenantId={tenantId} />
 

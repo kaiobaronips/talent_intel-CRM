@@ -118,6 +118,30 @@ def get_tenant(tenant_id: str) -> dict[str, Any]:
             return dict(cur.fetchone() or {})
 
 
+def update_tenant_metadata(tenant_id: str, metadata_updates: dict[str, Any]) -> dict[str, Any]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute("select metadata_json from tenants where id = %s", (tenant_id,))
+            existing = cur.fetchone()
+            if not existing:
+                return {}
+            metadata = existing.get("metadata_json") or {}
+            if not isinstance(metadata, dict):
+                metadata = {}
+            metadata.update(metadata_updates)
+            cur.execute(
+                """
+                update tenants
+                set metadata_json = %s::jsonb,
+                    updated_at = now()
+                where id = %s
+                returning id, slug, company_name, tier, primary_domain, timezone, metadata_json, created_at, updated_at
+                """,
+                (json.dumps(metadata, ensure_ascii=False), tenant_id),
+            )
+            return dict(cur.fetchone() or {})
+
+
 def upsert_tenant_membership(payload: dict[str, Any]) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:
@@ -311,6 +335,33 @@ def get_candidate(candidate_id: str) -> dict[str, Any]:
                 where id = %s
                 """,
                 (candidate_id,),
+            )
+            return dict(cur.fetchone() or {})
+
+
+def update_candidate_state(candidate_id: str, stage: str, metadata_updates: dict[str, Any] | None = None) -> dict[str, Any]:
+    metadata_updates = metadata_updates or {}
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute("select metadata_json from candidates where id = %s", (candidate_id,))
+            existing = cur.fetchone()
+            if not existing:
+                return {}
+            metadata = existing.get("metadata_json") or {}
+            if not isinstance(metadata, dict):
+                metadata = {}
+            metadata.update(metadata_updates)
+            cur.execute(
+                """
+                update candidates
+                set stage = %s,
+                    metadata_json = %s::jsonb,
+                    updated_at = now()
+                where id = %s
+                returning id, tenant_id, external_id, name, city, email, linkedin_url, stage, source_page_id,
+                    metadata_json, created_at, updated_at
+                """,
+                (stage, json.dumps(metadata, ensure_ascii=False), candidate_id),
             )
             return dict(cur.fetchone() or {})
 

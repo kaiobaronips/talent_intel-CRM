@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiMutation, getDefaultTenantId, updateInteractionStatus } from '@/lib/api';
+import { apiMutation, getDefaultTenantId, reviewInteractionMessage, updateCandidateDecision, updateInteractionStatus, updateTenantPreferences } from '@/lib/api';
 import type { InteractionStatus } from '@/lib/types';
 import { getSessionToken, refreshCookieName, sessionCookieName } from '@/lib/session';
 import { authErrorMessage, requireSupabaseAuthConfig, revokeSupabaseSession, setSessionCookie, type SupabaseTokenPayload } from '@/lib/supabase-auth';
@@ -272,4 +272,76 @@ export async function updateInteractionStatusAction(_previousState: ActionState,
   revalidateInteractionViews(tenantId, candidateId);
   const label = status === 'sent' ? 'Mensagem marcada como enviada.' : status === 'replied' ? 'Resposta registrada.' : 'Contato atualizado.';
   return { ok: true, message: label };
+}
+
+export async function reviewInteractionMessageAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const candidateId = text(formData, 'candidate_id');
+  const interactionId = text(formData, 'interaction_id');
+  const messageSent = text(formData, 'message_sent');
+  const decisionNote = text(formData, 'decision_note');
+  const status = (text(formData, 'status') || 'approved') as 'draft' | 'pending' | 'approved';
+
+  if (!interactionId || !candidateId || !messageSent) {
+    return { ...initialError, message: 'Informe a mensagem revisada antes de aprovar.' };
+  }
+
+  const result = await reviewInteractionMessage(interactionId, status, messageSent, decisionNote, await authOptions());
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateInteractionViews(tenantId, candidateId);
+  return { ok: true, message: status === 'approved' ? 'Mensagem aprovada para envio.' : 'Mensagem salva como rascunho.' };
+}
+
+export async function updateCandidateDecisionAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const candidateId = text(formData, 'candidate_id');
+  const decision = text(formData, 'decision') as 'active' | 'paused' | 'discarded';
+  const decisionNote = text(formData, 'decision_note');
+
+  if (!candidateId || !decision) {
+    return { ...initialError, message: 'Decisão inválida para o candidato.' };
+  }
+
+  const result = await updateCandidateDecision(candidateId, decision, decisionNote, await authOptions());
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateTenantViews(tenantId);
+  revalidatePath(`/candidates/${candidateId}`);
+  const label = decision === 'paused' ? 'Candidato pausado.' : decision === 'discarded' ? 'Candidato descartado.' : 'Candidato reativado.';
+  return { ok: true, message: label };
+}
+
+export async function updateTenantPreferencesAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const allowedChannels = ['email', 'linkedin'].filter((channel) => formData.get(`allowed_${channel}`) === 'on');
+  const result = await updateTenantPreferences(
+    tenantId,
+    {
+      target_roles: text(formData, 'target_roles'),
+      seniority: text(formData, 'seniority'),
+      locations: text(formData, 'locations'),
+      keywords: text(formData, 'keywords'),
+      allowed_channels: allowedChannels,
+      outreach_tone: text(formData, 'outreach_tone'),
+      daily_contact_limit: Number(text(formData, 'daily_contact_limit') || 20),
+      max_attempts_per_candidate: Number(text(formData, 'max_attempts_per_candidate') || 3),
+      follow_up_interval_days: Number(text(formData, 'follow_up_interval_days') || 5),
+      require_manual_approval: formData.get('require_manual_approval') === 'on',
+      linkedin_enabled: formData.get('linkedin_enabled') === 'on',
+      email_enabled: formData.get('email_enabled') === 'on',
+    },
+    await authOptions(),
+  );
+
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateTenantViews(tenantId);
+  return { ok: true, message: 'Preferências da empresa salvas.' };
 }

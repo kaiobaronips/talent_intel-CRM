@@ -33,7 +33,9 @@ from talent_intel_crm.db import (
     revoke_tenant_api_key,
     tenant_exists,
     tenant_metrics,
+    update_candidate_state,
     update_interaction_status,
+    update_tenant_metadata,
     upsert_tenant_membership,
 )
 from talent_intel_crm.domain import CandidateChannel, CandidateStage, TenantTier
@@ -102,8 +104,34 @@ class TenantAPIKeyCreateRequest(BaseModel):
 
 
 class InteractionStatusUpdateRequest(BaseModel):
-    status: str = Field(pattern="^(pending|sent|replied|closed)$")
+    status: str = Field(pattern="^(draft|pending|approved|sent|replied|closed|paused|discarded)$")
     response_received: str = Field(default="", max_length=2000)
+
+
+class InteractionReviewRequest(BaseModel):
+    status: str = Field(default="approved", pattern="^(draft|pending|approved)$")
+    message_sent: str = Field(min_length=1, max_length=4000)
+    decision_note: str = Field(default="", max_length=1000)
+
+
+class CandidateDecisionRequest(BaseModel):
+    decision: str = Field(pattern="^(active|paused|discarded)$")
+    decision_note: str = Field(default="", max_length=1000)
+
+
+class TenantPreferencesRequest(BaseModel):
+    target_roles: str = Field(default="", max_length=1000)
+    seniority: str = Field(default="", max_length=500)
+    locations: str = Field(default="", max_length=1000)
+    keywords: str = Field(default="", max_length=1000)
+    allowed_channels: List[str] = Field(default_factory=list)
+    outreach_tone: str = Field(default="", max_length=500)
+    daily_contact_limit: int = Field(default=20, ge=0, le=1000)
+    max_attempts_per_candidate: int = Field(default=3, ge=0, le=20)
+    follow_up_interval_days: int = Field(default=5, ge=0, le=60)
+    require_manual_approval: bool = True
+    linkedin_enabled: bool = True
+    email_enabled: bool = True
 
 
 def _success(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -307,6 +335,47 @@ async def read_tenant(tenant_id: str, principal: APIPrincipal = Depends(require_
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     authorize_tenant(principal, tenant["id"])
     return _success(tenant)
+
+
+@app.post("/v1/tenants/{tenant_id}/preferences")
+async def update_tenant_preferences(
+    tenant_id: str,
+    payload: TenantPreferencesRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_tenant_admin(principal, tenant_id)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    tenant = update_tenant_metadata(
+        tenant_id,
+        {
+            "ideal_profile": {
+                "target_roles": payload.target_roles,
+                "seniority": payload.seniority,
+                "locations": payload.locations,
+                "keywords": payload.keywords,
+                "allowed_channels": payload.allowed_channels,
+                "outreach_tone": payload.outreach_tone,
+            },
+            "mvp_limits": {
+                "daily_contact_limit": payload.daily_contact_limit,
+                "max_attempts_per_candidate": payload.max_attempts_per_candidate,
+                "follow_up_interval_days": payload.follow_up_interval_days,
+                "require_manual_approval": payload.require_manual_approval,
+                "linkedin_enabled": payload.linkedin_enabled,
+                "email_enabled": payload.email_enabled,
+            },
+        },
+    )
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="tenant.preferences_updated",
+        principal=principal,
+        payload={"ideal_profile": tenant.get("metadata_json", {}).get("ideal_profile", {}), "mvp_limits": tenant.get("metadata_json", {}).get("mvp_limits", {})},
+    )
+    return _success({"tenant_id": tenant_id, "tenant": tenant})
 
 
 @app.get("/v1/tenants/{tenant_id}/memberships")
@@ -554,6 +623,37 @@ async def read_candidate(candidate_id: str, principal: APIPrincipal = Depends(re
     return _success(_candidate_projection(candidate))
 
 
+@app.post("/v1/candidates/{candidate_id}/decision")
+async def update_candidate_decision(
+    candidate_id: str,
+    payload: CandidateDecisionRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    candidate = get_candidate(candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+    authorize_tenant(principal, candidate["tenant_id"])
+    stage = "paused" if payload.decision == "paused" else "discarded" if payload.decision == "discarded" else "qualified"
+    updated = update_candidate_state(
+        candidate_id,
+        stage,
+        {
+            "manual_decision": payload.decision,
+            "manual_decision_note": payload.decision_note,
+        },
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+    _record_audit_event(
+        tenant_id=candidate["tenant_id"],
+        candidate_id=candidate_id,
+        event_type="candidate.decision_updated",
+        principal=principal,
+        payload={"decision": payload.decision, "decision_note": payload.decision_note, "stage": stage},
+    )
+    return _success({"candidate": _candidate_projection(updated)})
+
+
 @app.get("/v1/tenants/{tenant_id}/candidates")
 async def read_tenant_candidates(
     tenant_id: str,
@@ -610,11 +710,52 @@ async def update_interaction_status_route(
     authorize_tenant(principal, interaction["tenant_id"])
 
     payload_updates: Dict[str, Any] = {}
+    interaction_payload = interaction.get("payload_json") or {}
+    if not isinstance(interaction_payload, dict):
+        interaction_payload = {}
+    if payload.status == "sent" and interaction.get("status") != "approved" and interaction_payload.get("manual_approval_status") != "approved":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message must be approved before send")
     if payload.response_received:
         payload_updates["response_received"] = payload.response_received
+    if payload.status == "sent":
+        payload_updates["manual_approval_status"] = "sent"
+    if payload.status == "replied":
+        payload_updates["manual_approval_status"] = "replied"
     updated = update_interaction_status(interaction_id, payload.status, payload_updates)
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
+    return _success({"interaction": _interaction_projection(updated)})
+
+
+@app.post("/v1/interactions/{interaction_id}/review")
+async def review_interaction_message(
+    interaction_id: str,
+    payload: InteractionReviewRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    interaction = get_interaction(interaction_id)
+    if not interaction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
+    authorize_tenant(principal, interaction["tenant_id"])
+
+    updated = update_interaction_status(
+        interaction_id,
+        payload.status,
+        {
+            "message_sent": payload.message_sent,
+            "manual_approval_status": payload.status,
+            "manual_decision_note": payload.decision_note,
+        },
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
+    _record_audit_event(
+        tenant_id=interaction["tenant_id"],
+        candidate_id=interaction["candidate_id"],
+        event_type="interaction.message_reviewed",
+        principal=principal,
+        payload={"interaction_id": interaction_id, "status": payload.status, "decision_note": payload.decision_note},
+    )
     return _success({"interaction": _interaction_projection(updated)})
 
 

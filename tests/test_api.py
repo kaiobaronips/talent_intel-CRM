@@ -416,3 +416,136 @@ def test_update_interaction_status_route(monkeypatch) -> None:
     assert interaction["status"] == "replied"
     assert interaction["interaction_status"] == "replied"
     assert interaction["response_received"] == "Tenho interesse."
+
+
+def test_review_interaction_message_route(monkeypatch) -> None:
+    events: list[dict[str, object]] = []
+    monkeypatch.setattr(api, "append_audit_event", lambda payload: events.append(payload) or {"id": "audit-1", **payload})
+    monkeypatch.setattr(
+        api,
+        "get_interaction",
+        lambda interaction_id: {
+            "id": interaction_id,
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "channel": "linkedin",
+            "status": "pending",
+            "payload_json": {"name": "Candidate One"},
+        },
+    )
+    monkeypatch.setattr(
+        api,
+        "update_interaction_status",
+        lambda interaction_id, status, payload_updates: {
+            "id": interaction_id,
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "channel": "linkedin",
+            "status": status,
+            "payload_json": {"name": "Candidate One", **payload_updates},
+        },
+    )
+
+    response = TestClient(api.app).post(
+        "/v1/interactions/interaction-001/review",
+        json={"status": "approved", "message_sent": "Mensagem revisada.", "decision_note": "Aprovado."},
+    )
+
+    assert response.status_code == 200
+    interaction = response.json()["data"]["interaction"]
+    assert interaction["status"] == "approved"
+    assert interaction["message_sent"] == "Mensagem revisada."
+    assert events[0]["event_type"] == "interaction.message_reviewed"
+
+
+def test_sent_interaction_requires_approval(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api,
+        "get_interaction",
+        lambda interaction_id: {
+            "id": interaction_id,
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "channel": "email",
+            "status": "pending",
+            "payload_json": {},
+        },
+    )
+
+    response = TestClient(api.app).post("/v1/interactions/interaction-001/status", json={"status": "sent"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Message must be approved before send"
+
+
+def test_candidate_decision_route(monkeypatch) -> None:
+    events: list[dict[str, object]] = []
+    monkeypatch.setattr(api, "append_audit_event", lambda payload: events.append(payload) or {"id": "audit-1", **payload})
+    monkeypatch.setattr(
+        api,
+        "get_candidate",
+        lambda candidate_id: {
+            "id": candidate_id,
+            "tenant_id": "tenant-001",
+            "name": "Candidate One",
+            "stage": "qualified",
+            "metadata_json": {},
+        },
+    )
+    monkeypatch.setattr(
+        api,
+        "update_candidate_state",
+        lambda candidate_id, stage, metadata_updates: {
+            "id": candidate_id,
+            "tenant_id": "tenant-001",
+            "name": "Candidate One",
+            "stage": stage,
+            "metadata_json": metadata_updates,
+        },
+    )
+
+    response = TestClient(api.app).post(
+        "/v1/candidates/candidate-001/decision",
+        json={"decision": "paused", "decision_note": "Aguardar novo momento."},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["candidate"]["stage"] == "paused"
+    assert response.json()["data"]["candidate"]["manual_decision"] == "paused"
+    assert events[0]["event_type"] == "candidate.decision_updated"
+
+
+def test_tenant_preferences_route(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(
+        api,
+        "update_tenant_metadata",
+        lambda tenant_id, metadata_updates: {
+            "id": tenant_id,
+            "company_name": "Tenant One",
+            "metadata_json": metadata_updates,
+        },
+    )
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/preferences",
+        json={
+            "target_roles": "Executivo de contas",
+            "seniority": "Senior",
+            "locations": "São Paulo",
+            "keywords": "B2B, SaaS",
+            "allowed_channels": ["email", "linkedin"],
+            "outreach_tone": "Consultivo",
+            "daily_contact_limit": 15,
+            "max_attempts_per_candidate": 3,
+            "follow_up_interval_days": 5,
+            "require_manual_approval": True,
+            "linkedin_enabled": True,
+            "email_enabled": True,
+        },
+    )
+
+    assert response.status_code == 200
+    metadata = response.json()["data"]["tenant"]["metadata_json"]
+    assert metadata["ideal_profile"]["target_roles"] == "Executivo de contas"
+    assert metadata["mvp_limits"]["daily_contact_limit"] == 15

@@ -5,7 +5,29 @@ export type Tenant = {
   tier?: string;
   timezone?: string;
   status?: string;
+  metadata_json?: TenantMetadata;
+  metadata?: TenantMetadata;
   created_at?: string;
+};
+
+export type TenantMetadata = {
+  ideal_profile?: {
+    target_roles?: string;
+    seniority?: string;
+    locations?: string;
+    keywords?: string;
+    allowed_channels?: string[];
+    outreach_tone?: string;
+  };
+  mvp_limits?: {
+    daily_contact_limit?: number;
+    max_attempts_per_candidate?: number;
+    follow_up_interval_days?: number;
+    require_manual_approval?: boolean;
+    linkedin_enabled?: boolean;
+    email_enabled?: boolean;
+  };
+  [key: string]: unknown;
 };
 
 export type Candidate = {
@@ -25,6 +47,8 @@ export type Candidate = {
   classification_reason?: string | null;
   profile_summary?: string | null;
   recommended_action?: string | null;
+  manual_decision?: string | null;
+  manual_decision_note?: string | null;
   score_overall?: number | null;
   stage?: string | null;
   created_at?: string;
@@ -42,13 +66,15 @@ export type Interaction = {
   next_action?: string | null;
   message_sent?: string | null;
   response_received?: string | null;
+  manual_approval_status?: string | null;
+  manual_decision_note?: string | null;
   payload_json?: Record<string, unknown> | null;
   scheduled_at?: string | null;
   sent_at?: string | null;
   created_at?: string;
 };
 
-export type InteractionStatus = 'pending' | 'sent' | 'replied' | 'closed';
+export type InteractionStatus = 'draft' | 'pending' | 'approved' | 'sent' | 'replied' | 'closed' | 'paused' | 'discarded';
 
 export type ApiKey = {
   id: string;

@@ -4,6 +4,7 @@ import { DataTable } from '@/components/DataTable';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
+import { TenantPreferenceForms } from '@/components/TenantPreferenceForms';
 import { getApiKeys, getCandidates, getInteractions, getTenant, getTenantMetrics } from '@/lib/api';
 import { formatScore } from '@/lib/format';
 import { getSessionToken, requireAuthenticatedPrincipal } from '@/lib/session';
@@ -45,6 +46,8 @@ export default async function TenantPage({ params }: TenantPageProps) {
         <CandidateCreateForm tenantId={tenantId} />
         <ApiKeyCreateForm tenantId={tenantId} />
       </section>
+
+      <TenantPreferenceForms tenant={tenant} />
 
       <ApiKeyLifecycleForm tenantId={tenantId} />
 

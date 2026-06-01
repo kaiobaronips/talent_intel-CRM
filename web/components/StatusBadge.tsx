@@ -8,6 +8,8 @@ const toneByValue: Record<string, string> = {
   connected: 'border-emerald-300 bg-emerald-50 text-emerald-800',
   ready: 'border-emerald-300 bg-emerald-50 text-emerald-800',
   pending: 'border-amber-300 bg-amber-50 text-amber-900',
+  draft: 'border-stone-300 bg-stone-100 text-stone-800',
+  approved: 'border-emerald-300 bg-emerald-50 text-emerald-800',
   sent: 'border-blue-300 bg-blue-50 text-blue-800',
   replied: 'border-emerald-300 bg-emerald-50 text-emerald-800',
   closed: 'border-stone-300 bg-stone-100 text-stone-800',
@@ -20,6 +22,8 @@ const toneByValue: Record<string, string> = {
   failed: 'border-rose-300 bg-rose-50 text-rose-800',
   erro: 'border-rose-300 bg-rose-50 text-rose-800',
   offline: 'border-rose-300 bg-rose-50 text-rose-800',
+  paused: 'border-amber-300 bg-amber-50 text-amber-900',
+  discarded: 'border-rose-300 bg-rose-50 text-rose-800',
 };
 
 const labelByValue: Record<string, string> = {
@@ -29,6 +33,8 @@ const labelByValue: Record<string, string> = {
   connected: 'Conectado',
   ready: 'Pronto',
   pending: 'Pendente',
+  draft: 'Rascunho',
+  approved: 'Aprovado para envio',
   sent: 'Mensagem enviada',
   replied: 'Resposta recebida',
   closed: 'Encerrado',
@@ -50,6 +56,8 @@ const labelByValue: Record<string, string> = {
   failed: 'Falhou',
   erro: 'Erro',
   offline: 'Offline',
+  paused: 'Pausado',
+  discarded: 'Descartado',
 };
 
 type StatusBadgeProps = {

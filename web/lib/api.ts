@@ -178,6 +178,40 @@ export async function updateInteractionStatus(
   }, options);
 }
 
+export async function reviewInteractionMessage(
+  interactionId: string,
+  status: 'draft' | 'pending' | 'approved',
+  messageSent: string,
+  decisionNote = '',
+  options: ApiAuthOptions = {},
+): Promise<ApiMutationResult<{ interaction: Interaction }>> {
+  return apiMutation<{ interaction: Interaction }>(`/v1/interactions/${interactionId}/review`, 'POST', {
+    status,
+    message_sent: messageSent,
+    decision_note: decisionNote,
+  }, options);
+}
+
+export async function updateCandidateDecision(
+  candidateId: string,
+  decision: 'active' | 'paused' | 'discarded',
+  decisionNote = '',
+  options: ApiAuthOptions = {},
+): Promise<ApiMutationResult<{ candidate: Candidate }>> {
+  return apiMutation<{ candidate: Candidate }>(`/v1/candidates/${candidateId}/decision`, 'POST', {
+    decision,
+    decision_note: decisionNote,
+  }, options);
+}
+
+export async function updateTenantPreferences(
+  tenantId: string,
+  payload: Record<string, unknown>,
+  options: ApiAuthOptions = {},
+): Promise<ApiMutationResult<{ tenant: Tenant }>> {
+  return apiMutation<{ tenant: Tenant }>(`/v1/tenants/${tenantId}/preferences`, 'POST', payload, options);
+}
+
 export async function getMemberships(tenantId = defaultTenantId, options: ApiAuthOptions = {}): Promise<ApiResult<TenantMembership[]>> {
   const result = await apiGetRaw<MembershipsPayload>(`/v1/tenants/${tenantId}/memberships`, { tenant_id: tenantId, items: fallbackMemberships }, options);
   return { data: result.data.items, offline: result.offline, status: result.status, message: result.message };

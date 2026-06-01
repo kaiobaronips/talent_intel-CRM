@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { InteractionReviewForm } from '@/components/InteractionReviewForm';
 import { InteractionStatusForms } from '@/components/InteractionStatusForms';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatDateTime } from '@/lib/format';
@@ -70,6 +71,10 @@ export function InteractionContactCards({ interactions, tenantId, showCandidateL
               </div>
 
               <div className="mt-4 border-t border-stone-200 pt-4">
+                <InteractionReviewForm interaction={interaction} tenantId={tenantId} />
+              </div>
+
+              <div className="mt-3 border-t border-stone-200 pt-4">
                 <InteractionStatusForms interaction={interaction} tenantId={tenantId} />
               </div>
             </article>
