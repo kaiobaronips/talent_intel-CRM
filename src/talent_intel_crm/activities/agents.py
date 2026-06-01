@@ -146,9 +146,10 @@ def _llm_provider_order() -> tuple[tuple[str, Any], ...]:
 
 def _llm_chat_json(system_prompt: str, user_payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     for provider, chat in _llm_provider_order():
-        result = chat(system_prompt, user_payload)
-        if result:
-            return provider, result
+        for _ in range(2):
+            result = chat(system_prompt, user_payload)
+            if result:
+                return provider, result
     return "", {}
 
 
@@ -285,7 +286,9 @@ def _openai_message(payload: dict[str, Any]) -> dict[str, Any]:
             "Voce escreve mensagens curtas de recrutamento em PT-BR. "
             "Use os templates como base, personalize com os dados do candidato e mantenha tom humano. "
             "Nao prometa salario, vaga ou entrevista. Retorne JSON. "
-            "Para email: subject e body. Para linkedin: text. Sempre inclua language e template_status."
+            'Para email, retorne exatamente: {"subject":"...", "body":"..."}. '
+            'Para linkedin, retorne exatamente: {"text":"..."}. '
+            "Sempre inclua language e template_status quando possivel."
         ),
         {
             "candidate": payload,
