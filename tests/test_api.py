@@ -549,3 +549,35 @@ def test_tenant_preferences_route(monkeypatch) -> None:
     metadata = response.json()["data"]["tenant"]["metadata_json"]
     assert metadata["ideal_profile"]["target_roles"] == "Executivo de contas"
     assert metadata["mvp_limits"]["daily_contact_limit"] == 15
+
+
+def test_tenant_message_templates_route(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(
+        api,
+        "update_tenant_metadata",
+        lambda tenant_id, metadata_updates: {
+            "id": tenant_id,
+            "company_name": "Tenant One",
+            "metadata_json": metadata_updates,
+        },
+    )
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/message-templates",
+        json={
+            "email_initial_subject": "Convite rápido",
+            "email_initial_body": "Olá {{nome}}.",
+            "email_follow_up_subject": "Retomando",
+            "email_follow_up_body": "Retomando meu contato.",
+            "linkedin_connection_note": "Vamos conectar?",
+            "linkedin_initial_message": "Obrigado por conectar.",
+            "linkedin_follow_up_message": "Retomando por aqui.",
+            "response_follow_up_message": "Obrigado pelo retorno.",
+        },
+    )
+
+    assert response.status_code == 200
+    templates = response.json()["data"]["tenant"]["metadata_json"]["message_templates"]
+    assert templates["email_initial_subject"] == "Convite rápido"
+    assert templates["linkedin_initial_message"] == "Obrigado por conectar."

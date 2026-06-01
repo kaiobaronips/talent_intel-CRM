@@ -27,6 +27,16 @@ export type TenantMetadata = {
     linkedin_enabled?: boolean;
     email_enabled?: boolean;
   };
+  message_templates?: {
+    email_initial_subject?: string;
+    email_initial_body?: string;
+    email_follow_up_subject?: string;
+    email_follow_up_body?: string;
+    linkedin_connection_note?: string;
+    linkedin_initial_message?: string;
+    linkedin_follow_up_message?: string;
+    response_follow_up_message?: string;
+  };
   [key: string]: unknown;
 };
 

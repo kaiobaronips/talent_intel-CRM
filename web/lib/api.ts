@@ -212,6 +212,14 @@ export async function updateTenantPreferences(
   return apiMutation<{ tenant: Tenant }>(`/v1/tenants/${tenantId}/preferences`, 'POST', payload, options);
 }
 
+export async function updateTenantMessageTemplates(
+  tenantId: string,
+  payload: Record<string, unknown>,
+  options: ApiAuthOptions = {},
+): Promise<ApiMutationResult<{ tenant: Tenant }>> {
+  return apiMutation<{ tenant: Tenant }>(`/v1/tenants/${tenantId}/message-templates`, 'POST', payload, options);
+}
+
 export async function getMemberships(tenantId = defaultTenantId, options: ApiAuthOptions = {}): Promise<ApiResult<TenantMembership[]>> {
   const result = await apiGetRaw<MembershipsPayload>(`/v1/tenants/${tenantId}/memberships`, { tenant_id: tenantId, items: fallbackMemberships }, options);
   return { data: result.data.items, offline: result.offline, status: result.status, message: result.message };

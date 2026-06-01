@@ -14,6 +14,7 @@ function navItems(activeTenantId: string) {
     { href: '/members', label: 'Equipe' },
     { href: '/workflows', label: 'Automações' },
     { href: '/audit', label: 'Histórico' },
+    { href: '/settings', label: 'Configurações' },
     { href: '/system', label: 'Saúde do sistema' },
   ];
 }

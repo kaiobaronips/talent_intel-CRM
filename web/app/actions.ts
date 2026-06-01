@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiMutation, getDefaultTenantId, reviewInteractionMessage, updateCandidateDecision, updateInteractionStatus, updateTenantPreferences } from '@/lib/api';
+import { apiMutation, getDefaultTenantId, reviewInteractionMessage, updateCandidateDecision, updateInteractionStatus, updateTenantMessageTemplates, updateTenantPreferences } from '@/lib/api';
 import type { InteractionStatus } from '@/lib/types';
 import { getSessionToken, refreshCookieName, sessionCookieName } from '@/lib/session';
 import { authErrorMessage, requireSupabaseAuthConfig, revokeSupabaseSession, setSessionCookie, type SupabaseTokenPayload } from '@/lib/supabase-auth';
@@ -25,6 +25,7 @@ function revalidateTenantViews(tenantId: string) {
   revalidatePath('/candidates');
   revalidatePath('/interactions');
   revalidatePath(`/tenants/${tenantId}`);
+  revalidatePath('/settings');
 }
 
 function revalidateInteractionViews(tenantId: string, candidateId: string) {
@@ -344,4 +345,29 @@ export async function updateTenantPreferencesAction(_previousState: ActionState,
 
   revalidateTenantViews(tenantId);
   return { ok: true, message: 'Preferências da empresa salvas.' };
+}
+
+export async function updateTenantMessageTemplatesAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const result = await updateTenantMessageTemplates(
+    tenantId,
+    {
+      email_initial_subject: text(formData, 'email_initial_subject'),
+      email_initial_body: text(formData, 'email_initial_body'),
+      email_follow_up_subject: text(formData, 'email_follow_up_subject'),
+      email_follow_up_body: text(formData, 'email_follow_up_body'),
+      linkedin_connection_note: text(formData, 'linkedin_connection_note'),
+      linkedin_initial_message: text(formData, 'linkedin_initial_message'),
+      linkedin_follow_up_message: text(formData, 'linkedin_follow_up_message'),
+      response_follow_up_message: text(formData, 'response_follow_up_message'),
+    },
+    await authOptions(),
+  );
+
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateTenantViews(tenantId);
+  return { ok: true, message: 'Mensagens da automação salvas.' };
 }

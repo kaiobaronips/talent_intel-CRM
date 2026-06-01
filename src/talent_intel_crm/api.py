@@ -134,6 +134,17 @@ class TenantPreferencesRequest(BaseModel):
     email_enabled: bool = True
 
 
+class TenantMessageTemplatesRequest(BaseModel):
+    email_initial_subject: str = Field(default="", max_length=500)
+    email_initial_body: str = Field(default="", max_length=4000)
+    email_follow_up_subject: str = Field(default="", max_length=500)
+    email_follow_up_body: str = Field(default="", max_length=4000)
+    linkedin_connection_note: str = Field(default="", max_length=1000)
+    linkedin_initial_message: str = Field(default="", max_length=4000)
+    linkedin_follow_up_message: str = Field(default="", max_length=4000)
+    response_follow_up_message: str = Field(default="", max_length=4000)
+
+
 def _success(data: Dict[str, Any]) -> Dict[str, Any]:
     return {"success": True, "data": data}
 
@@ -374,6 +385,37 @@ async def update_tenant_preferences(
         event_type="tenant.preferences_updated",
         principal=principal,
         payload={"ideal_profile": tenant.get("metadata_json", {}).get("ideal_profile", {}), "mvp_limits": tenant.get("metadata_json", {}).get("mvp_limits", {})},
+    )
+    return _success({"tenant_id": tenant_id, "tenant": tenant})
+
+
+@app.post("/v1/tenants/{tenant_id}/message-templates")
+async def update_tenant_message_templates(
+    tenant_id: str,
+    payload: TenantMessageTemplatesRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_tenant_admin(principal, tenant_id)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    message_templates = {
+        "email_initial_subject": payload.email_initial_subject,
+        "email_initial_body": payload.email_initial_body,
+        "email_follow_up_subject": payload.email_follow_up_subject,
+        "email_follow_up_body": payload.email_follow_up_body,
+        "linkedin_connection_note": payload.linkedin_connection_note,
+        "linkedin_initial_message": payload.linkedin_initial_message,
+        "linkedin_follow_up_message": payload.linkedin_follow_up_message,
+        "response_follow_up_message": payload.response_follow_up_message,
+    }
+    tenant = update_tenant_metadata(tenant_id, {"message_templates": message_templates})
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="tenant.message_templates_updated",
+        principal=principal,
+        payload={"template_keys": list(message_templates.keys())},
     )
     return _success({"tenant_id": tenant_id, "tenant": tenant})
 
