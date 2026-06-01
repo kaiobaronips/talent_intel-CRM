@@ -30,8 +30,12 @@ export type TenantMetadata = {
   message_templates?: {
     email_initial_subject?: string;
     email_initial_body?: string;
-    email_follow_up_subject?: string;
-    email_follow_up_body?: string;
+    email_follow_up_1_subject?: string;
+    email_follow_up_1_body?: string;
+    email_follow_up_2_subject?: string;
+    email_follow_up_2_body?: string;
+    email_follow_up_3_subject?: string;
+    email_follow_up_3_body?: string;
     linkedin_connection_note?: string;
     linkedin_initial_message?: string;
     linkedin_follow_up_message?: string;

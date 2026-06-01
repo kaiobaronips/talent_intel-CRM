@@ -47,12 +47,28 @@ export function TenantMessageTemplateForm({ tenant }: TenantMessageTemplateFormP
               <textarea name="email_initial_body" rows={7} defaultValue={valueOf(templates.email_initial_body, 'Olá {{nome}}, tudo bem? Vi seu perfil e acredito que sua experiência em {{cargo}} pode ter aderência com uma oportunidade que estamos avaliando. Faz sentido conversarmos rapidamente esta semana?')} className="rounded-lg border border-stone-200 px-4 py-3 leading-6" />
             </label>
             <label className="grid gap-2 text-sm font-bold text-stone-700">
-              Assunto de follow-up
-              <input name="email_follow_up_subject" defaultValue={valueOf(templates.email_follow_up_subject, 'Retomando meu contato')} className="rounded-lg border border-stone-200 px-4 py-3" />
+              Assunto follow-up 1
+              <input name="email_follow_up_1_subject" defaultValue={valueOf(templates.email_follow_up_1_subject, 'Retomando meu contato')} className="rounded-lg border border-stone-200 px-4 py-3" />
             </label>
             <label className="grid gap-2 text-sm font-bold text-stone-700">
-              Follow-up por e-mail
-              <textarea name="email_follow_up_body" rows={6} defaultValue={valueOf(templates.email_follow_up_body, 'Olá {{nome}}, passando para retomar meu contato anterior. Se fizer sentido para você, posso compartilhar mais contexto sobre a oportunidade.')} className="rounded-lg border border-stone-200 px-4 py-3 leading-6" />
+              Follow-up 1
+              <textarea name="email_follow_up_1_body" rows={5} defaultValue={valueOf(templates.email_follow_up_1_body, 'Olá {{nome}}, passando para retomar meu contato anterior. Se fizer sentido para você, posso compartilhar mais contexto sobre a oportunidade.')} className="rounded-lg border border-stone-200 px-4 py-3 leading-6" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-stone-700">
+              Assunto follow-up 2
+              <input name="email_follow_up_2_subject" defaultValue={valueOf(templates.email_follow_up_2_subject, 'Ainda faz sentido conversarmos?')} className="rounded-lg border border-stone-200 px-4 py-3" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-stone-700">
+              Follow-up 2
+              <textarea name="email_follow_up_2_body" rows={5} defaultValue={valueOf(templates.email_follow_up_2_body, 'Olá {{nome}}, sei que a agenda pode estar corrida. Caso este tema faça sentido, posso te enviar um resumo objetivo da oportunidade.')} className="rounded-lg border border-stone-200 px-4 py-3 leading-6" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-stone-700">
+              Assunto follow-up 3
+              <input name="email_follow_up_3_subject" defaultValue={valueOf(templates.email_follow_up_3_subject, 'Encerrando meu contato por enquanto')} className="rounded-lg border border-stone-200 px-4 py-3" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-stone-700">
+              Follow-up 3 despedida
+              <textarea name="email_follow_up_3_body" rows={5} defaultValue={valueOf(templates.email_follow_up_3_body, 'Olá {{nome}}, este será meu último contato por enquanto. Se a conversa fizer sentido no futuro, fico à disposição para retomarmos. Obrigado.')} className="rounded-lg border border-stone-200 px-4 py-3 leading-6" />
             </label>
           </div>
         </section>

@@ -568,8 +568,12 @@ def test_tenant_message_templates_route(monkeypatch) -> None:
         json={
             "email_initial_subject": "Convite rápido",
             "email_initial_body": "Olá {{nome}}.",
-            "email_follow_up_subject": "Retomando",
-            "email_follow_up_body": "Retomando meu contato.",
+            "email_follow_up_1_subject": "Retomando 1",
+            "email_follow_up_1_body": "Retomando meu contato.",
+            "email_follow_up_2_subject": "Retomando 2",
+            "email_follow_up_2_body": "Segundo follow-up.",
+            "email_follow_up_3_subject": "Encerrando contato",
+            "email_follow_up_3_body": "Último contato por enquanto.",
             "linkedin_connection_note": "Vamos conectar?",
             "linkedin_initial_message": "Obrigado por conectar.",
             "linkedin_follow_up_message": "Retomando por aqui.",
@@ -580,4 +584,5 @@ def test_tenant_message_templates_route(monkeypatch) -> None:
     assert response.status_code == 200
     templates = response.json()["data"]["tenant"]["metadata_json"]["message_templates"]
     assert templates["email_initial_subject"] == "Convite rápido"
+    assert templates["email_follow_up_3_subject"] == "Encerrando contato"
     assert templates["linkedin_initial_message"] == "Obrigado por conectar."

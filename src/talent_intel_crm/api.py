@@ -137,8 +137,12 @@ class TenantPreferencesRequest(BaseModel):
 class TenantMessageTemplatesRequest(BaseModel):
     email_initial_subject: str = Field(default="", max_length=500)
     email_initial_body: str = Field(default="", max_length=4000)
-    email_follow_up_subject: str = Field(default="", max_length=500)
-    email_follow_up_body: str = Field(default="", max_length=4000)
+    email_follow_up_1_subject: str = Field(default="", max_length=500)
+    email_follow_up_1_body: str = Field(default="", max_length=4000)
+    email_follow_up_2_subject: str = Field(default="", max_length=500)
+    email_follow_up_2_body: str = Field(default="", max_length=4000)
+    email_follow_up_3_subject: str = Field(default="", max_length=500)
+    email_follow_up_3_body: str = Field(default="", max_length=4000)
     linkedin_connection_note: str = Field(default="", max_length=1000)
     linkedin_initial_message: str = Field(default="", max_length=4000)
     linkedin_follow_up_message: str = Field(default="", max_length=4000)
@@ -401,8 +405,12 @@ async def update_tenant_message_templates(
     message_templates = {
         "email_initial_subject": payload.email_initial_subject,
         "email_initial_body": payload.email_initial_body,
-        "email_follow_up_subject": payload.email_follow_up_subject,
-        "email_follow_up_body": payload.email_follow_up_body,
+        "email_follow_up_1_subject": payload.email_follow_up_1_subject,
+        "email_follow_up_1_body": payload.email_follow_up_1_body,
+        "email_follow_up_2_subject": payload.email_follow_up_2_subject,
+        "email_follow_up_2_body": payload.email_follow_up_2_body,
+        "email_follow_up_3_subject": payload.email_follow_up_3_subject,
+        "email_follow_up_3_body": payload.email_follow_up_3_body,
         "linkedin_connection_note": payload.linkedin_connection_note,
         "linkedin_initial_message": payload.linkedin_initial_message,
         "linkedin_follow_up_message": payload.linkedin_follow_up_message,
