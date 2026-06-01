@@ -12,6 +12,7 @@ def test_agent_activities_return_dry_run_payloads(monkeypatch) -> None:
     monkeypatch.delenv("CANDIDATE_CLASSIFICATION_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("OUTREACH_TEMPLATE_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     payload = {
         "candidate_id": "candidate-001",
@@ -41,6 +42,7 @@ def test_agent_activities_return_dry_run_payloads(monkeypatch) -> None:
 def test_linkedin_template_uses_text_message(monkeypatch) -> None:
     monkeypatch.delenv("OUTREACH_TEMPLATE_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     result = render_outreach_message(
         {
@@ -77,6 +79,30 @@ def test_openai_classification_is_used_when_configured(monkeypatch) -> None:
     assert result["endpoint"] == "openai"
     assert result["result"]["classification"]["classification_status"] == "openai"
     assert result["result"]["classification"]["score_overall"] == 91
+
+
+def test_openrouter_classification_is_used_when_openai_fails(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-router-key")
+    monkeypatch.setattr("talent_intel_crm.activities.agents._openai_chat_json", lambda _prompt, _payload: {})
+    monkeypatch.setattr(
+        "talent_intel_crm.activities.agents._openrouter_chat_json",
+        lambda _prompt, _payload: {
+            "score_overall": 84,
+            "classification": "A",
+            "classification_reason": "Perfil aderente com validação pendente.",
+            "recommended_action": "Revisar e aprovar abordagem.",
+            "profile_summary": "Executivo comercial.",
+        },
+    )
+    monkeypatch.setattr("talent_intel_crm.activities.agents._tenant_metadata", lambda _payload: {"ideal_profile": {"target_roles": "Comercial"}})
+
+    result = classify_candidate_fit({"candidate_id": "candidate-001", "tenant_id": "tenant-001", "name": "Candidate One"})
+
+    assert result["executed"] is True
+    assert result["endpoint"] == "openrouter"
+    assert result["result"]["classification"]["classification_status"] == "openrouter"
+    assert result["result"]["classification"]["score_overall"] == 84
 
 
 def test_openai_message_is_used_when_configured(monkeypatch) -> None:

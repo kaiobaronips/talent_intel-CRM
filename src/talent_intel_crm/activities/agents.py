@@ -48,35 +48,51 @@ def _json_from_text(value: str) -> dict[str, Any]:
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
-        return {}
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start < 0 or end <= start:
+            return {}
+        try:
+            parsed = json.loads(raw[start : end + 1])
+        except json.JSONDecodeError:
+            return {}
     return parsed if isinstance(parsed, dict) else {}
 
 
-def _openai_chat_json(system_prompt: str, user_payload: dict[str, Any]) -> dict[str, Any]:
-    api_key = env("OPENAI_API_KEY")
-    if not api_key:
+def _chat_json(
+    *,
+    endpoint: str,
+    api_key: str,
+    model: str,
+    system_prompt: str,
+    user_payload: dict[str, Any],
+    response_format: bool = True,
+    extra_headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    if not api_key or not model:
         return {}
-    model = env("OPENAI_MODEL", "gpt-4.1-mini")
-    body = json.dumps(
-        {
-            "model": model,
-            "temperature": 0.2,
-            "response_format": {"type": "json_object"},
+    request_payload: dict[str, Any] = {
+        "model": model,
+        "temperature": 0.2,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
             ],
-        },
-        ensure_ascii=False,
-    ).encode("utf-8")
+    }
+    if response_format:
+        request_payload["response_format"] = {"type": "json_object"}
+    body = json.dumps(request_payload, ensure_ascii=False).encode("utf-8")
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    if extra_headers:
+        headers.update(extra_headers)
     request = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
+        endpoint,
         data=body,
         method="POST",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
@@ -89,6 +105,39 @@ def _openai_chat_json(system_prompt: str, user_payload: dict[str, Any]) -> dict[
     message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
     content = message.get("content", "") if isinstance(message, dict) else ""
     return _json_from_text(content) if isinstance(content, str) else {}
+
+
+def _openai_chat_json(system_prompt: str, user_payload: dict[str, Any]) -> dict[str, Any]:
+    return _chat_json(
+        endpoint="https://api.openai.com/v1/chat/completions",
+        api_key=env("OPENAI_API_KEY"),
+        model=env("OPENAI_MODEL", "gpt-4.1-mini"),
+        system_prompt=system_prompt,
+        user_payload=user_payload,
+    )
+
+
+def _openrouter_chat_json(system_prompt: str, user_payload: dict[str, Any]) -> dict[str, Any]:
+    return _chat_json(
+        endpoint="https://openrouter.ai/api/v1/chat/completions",
+        api_key=env("OPENROUTER_API_KEY"),
+        model=env("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash"),
+        system_prompt=system_prompt,
+        user_payload=user_payload,
+        response_format=False,
+        extra_headers={
+            "HTTP-Referer": env("OPENROUTER_SITE_URL", "https://talent-intel-crm.vercel.app"),
+            "X-Title": env("OPENROUTER_APP_TITLE", "Talent Intel CRM"),
+        },
+    )
+
+
+def _llm_chat_json(system_prompt: str, user_payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    for provider, chat in (("openai", _openai_chat_json), ("openrouter", _openrouter_chat_json)):
+        result = chat(system_prompt, user_payload)
+        if result:
+            return provider, result
+    return "", {}
 
 
 def _dry_enrichment(payload: dict[str, Any]) -> dict[str, Any]:
@@ -159,7 +208,7 @@ def _dry_classification(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _openai_classification(payload: dict[str, Any]) -> dict[str, Any]:
     metadata = _tenant_metadata(payload)
-    result = _openai_chat_json(
+    provider, result = _llm_chat_json(
         (
             "Voce e um agente de recrutamento B2B para o Talent Intel CRM. "
             "Classifique o candidato em PT-BR usando apenas os dados fornecidos. "
@@ -184,7 +233,7 @@ def _openai_classification(payload: dict[str, Any]) -> dict[str, Any]:
     if classification not in {"A", "B", "C"}:
         classification = "A" if score_value >= 80 else "B" if score_value >= 65 else "C"
     return {
-        "classification_status": "openai",
+        "classification_status": provider,
         "score_overall": score_value,
         "classification": classification,
         "classification_reason": _clean_text(result.get("classification_reason")) or _dry_classification(payload)["classification_reason"],
@@ -219,7 +268,7 @@ def _dry_message(payload: dict[str, Any]) -> dict[str, Any]:
 def _openai_message(payload: dict[str, Any]) -> dict[str, Any]:
     metadata = _tenant_metadata(payload)
     channel = _clean_text(payload.get("channel")) or "email"
-    result = _openai_chat_json(
+    provider, result = _llm_chat_json(
         (
             "Voce escreve mensagens curtas de recrutamento em PT-BR. "
             "Use os templates como base, personalize com os dados do candidato e mantenha tom humano. "
@@ -240,12 +289,12 @@ def _openai_message(payload: dict[str, Any]) -> dict[str, Any]:
         text = _clean_text(result.get("text"))
         if not text:
             return {}
-        return {"text": text, "language": "pt-BR", "template_status": "openai"}
+        return {"text": text, "language": "pt-BR", "template_status": provider}
     subject = _clean_text(result.get("subject"))
     body = _clean_text(result.get("body"))
     if not subject or not body:
         return {}
-    return {"subject": subject, "body": body, "language": "pt-BR", "template_status": "openai"}
+    return {"subject": subject, "body": body, "language": "pt-BR", "template_status": provider}
 
 
 @activity.defn
@@ -301,7 +350,7 @@ def classify_candidate_fit(payload: dict[str, Any]) -> dict[str, Any]:
         return action_result(
             "candidate.classify_fit",
             payload,
-            endpoint="openai",
+            endpoint=openai_result.get("classification_status", "llm"),
             executed=True,
             result={"classification": openai_result},
         )
@@ -336,7 +385,7 @@ def render_outreach_message(payload: dict[str, Any]) -> dict[str, Any]:
         return action_result(
             "outreach.render_message",
             payload,
-            endpoint="openai",
+            endpoint=openai_result.get("template_status", "llm"),
             executed=True,
             result={"message": openai_result},
         )

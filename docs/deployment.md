@@ -73,6 +73,8 @@ Worker side effects:
 - `OUTREACH_TEMPLATE_WEBHOOK_URL`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL`
 - `NOTION_MIRROR_*`
 
 ## Production split
@@ -115,6 +117,8 @@ Required Railway variables:
 - `TEMPORAL_USE_TLS=true`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL=gpt-4.1-mini`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL=deepseek/deepseek-v4-flash`
 
 Do not configure `NOTION_MIRROR_*` in Railway for the MVP worker unless rate limiting has been handled. Supabase Postgres remains the operational source of truth.
 
