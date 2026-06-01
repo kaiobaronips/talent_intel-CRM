@@ -83,6 +83,8 @@ As activities usam `Supabase Postgres` como persistencia principal e webhooks op
 - `CANDIDATE_ENRICHMENT_WEBHOOK_URL`
 - `CANDIDATE_CLASSIFICATION_WEBHOOK_URL`
 - `OUTREACH_TEMPLATE_WEBHOOK_URL`
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` default: `gpt-4.1-mini`
 - `NOTION_MIRROR_API_TOKEN`
 - `NOTION_MIRROR_TENANTS_DATA_SOURCE_ID`
 - `NOTION_MIRROR_CANDIDATES_DATA_SOURCE_ID`
@@ -100,6 +102,7 @@ O lifecycle do candidato ja chama agentes operacionais em sequencia:
 4. envio por email e/ou LinkedIn
 
 Os webhooks podem ser conectados a provedores reais de sourcing, enriquecimento, LLM ou automacao de canal mantendo o mesmo contrato de workflow.
+Quando `OPENAI_API_KEY` estiver configurado, as activities de classificacao e renderizacao de mensagem usam OpenAI diretamente antes de recorrer aos webhooks/dry-run. A IA gera score, classificacao, justificativa, resumo e copy inicial; o envio continua bloqueado por aprovacao humana na UI.
 
 ## Cadencia
 

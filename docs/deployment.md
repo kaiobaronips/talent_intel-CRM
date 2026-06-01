@@ -71,6 +71,8 @@ Worker side effects:
 - `CANDIDATE_ENRICHMENT_WEBHOOK_URL`
 - `CANDIDATE_CLASSIFICATION_WEBHOOK_URL`
 - `OUTREACH_TEMPLATE_WEBHOOK_URL`
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
 - `NOTION_MIRROR_*`
 
 ## Production split
@@ -111,6 +113,8 @@ Required Railway variables:
 - `TEMPORAL_API_KEY`
 - `TEMPORAL_TASK_QUEUE=talent-intel-crm`
 - `TEMPORAL_USE_TLS=true`
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL=gpt-4.1-mini`
 
 Do not configure `NOTION_MIRROR_*` in Railway for the MVP worker unless rate limiting has been handled. Supabase Postgres remains the operational source of truth.
 

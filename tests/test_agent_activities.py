@@ -11,6 +11,7 @@ def test_agent_activities_return_dry_run_payloads(monkeypatch) -> None:
     monkeypatch.delenv("CANDIDATE_ENRICHMENT_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("CANDIDATE_CLASSIFICATION_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("OUTREACH_TEMPLATE_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     payload = {
         "candidate_id": "candidate-001",
@@ -39,6 +40,7 @@ def test_agent_activities_return_dry_run_payloads(monkeypatch) -> None:
 
 def test_linkedin_template_uses_text_message(monkeypatch) -> None:
     monkeypatch.delenv("OUTREACH_TEMPLATE_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     result = render_outreach_message(
         {
@@ -53,3 +55,44 @@ def test_linkedin_template_uses_text_message(monkeypatch) -> None:
     assert result["executed"] is False
     assert "Candidate One" in result["result"]["message"]["text"]
     assert result["result"]["message"]["language"] == "pt-BR"
+
+
+def test_openai_classification_is_used_when_configured(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "talent_intel_crm.activities.agents._openai_chat_json",
+        lambda _prompt, _payload: {
+            "score_overall": 91,
+            "classification": "A",
+            "classification_reason": "Perfil aderente ao cargo alvo.",
+            "recommended_action": "Aprovar abordagem consultiva.",
+            "profile_summary": "Executivo comercial B2B.",
+        },
+    )
+    monkeypatch.setattr("talent_intel_crm.activities.agents._tenant_metadata", lambda _payload: {"ideal_profile": {"target_roles": "Comercial"}})
+
+    result = classify_candidate_fit({"candidate_id": "candidate-001", "tenant_id": "tenant-001", "name": "Candidate One"})
+
+    assert result["executed"] is True
+    assert result["endpoint"] == "openai"
+    assert result["result"]["classification"]["classification_status"] == "openai"
+    assert result["result"]["classification"]["score_overall"] == 91
+
+
+def test_openai_message_is_used_when_configured(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "talent_intel_crm.activities.agents._openai_chat_json",
+        lambda _prompt, _payload: {
+            "subject": "Conversa rápida",
+            "body": "Olá Candidate One, podemos conversar?",
+        },
+    )
+    monkeypatch.setattr("talent_intel_crm.activities.agents._tenant_metadata", lambda _payload: {"message_templates": {}})
+
+    result = render_outreach_message({"candidate_id": "candidate-001", "tenant_id": "tenant-001", "name": "Candidate One", "channel": "email"})
+
+    assert result["executed"] is True
+    assert result["endpoint"] == "openai"
+    assert result["result"]["message"]["template_status"] == "openai"
+    assert result["result"]["message"]["subject"] == "Conversa rápida"
