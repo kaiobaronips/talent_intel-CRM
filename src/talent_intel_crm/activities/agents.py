@@ -132,8 +132,20 @@ def _openrouter_chat_json(system_prompt: str, user_payload: dict[str, Any]) -> d
     )
 
 
+def _llm_provider_order() -> tuple[tuple[str, Any], ...]:
+    providers = {
+        "openai": _openai_chat_json,
+        "openrouter": _openrouter_chat_json,
+    }
+    preferred = env("LLM_PROVIDER").lower()
+    if preferred in providers:
+        fallback = "openrouter" if preferred == "openai" else "openai"
+        return ((preferred, providers[preferred]), (fallback, providers[fallback]))
+    return (("openai", _openai_chat_json), ("openrouter", _openrouter_chat_json))
+
+
 def _llm_chat_json(system_prompt: str, user_payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-    for provider, chat in (("openai", _openai_chat_json), ("openrouter", _openrouter_chat_json)):
+    for provider, chat in _llm_provider_order():
         result = chat(system_prompt, user_payload)
         if result:
             return provider, result

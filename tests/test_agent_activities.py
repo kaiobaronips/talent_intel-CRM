@@ -13,6 +13,7 @@ def test_agent_activities_return_dry_run_payloads(monkeypatch) -> None:
     monkeypatch.delenv("OUTREACH_TEMPLATE_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
 
     payload = {
         "candidate_id": "candidate-001",
@@ -43,6 +44,7 @@ def test_linkedin_template_uses_text_message(monkeypatch) -> None:
     monkeypatch.delenv("OUTREACH_TEMPLATE_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
 
     result = render_outreach_message(
         {
@@ -103,6 +105,36 @@ def test_openrouter_classification_is_used_when_openai_fails(monkeypatch) -> Non
     assert result["endpoint"] == "openrouter"
     assert result["result"]["classification"]["classification_status"] == "openrouter"
     assert result["result"]["classification"]["score_overall"] == 84
+
+
+def test_llm_provider_can_prioritize_openrouter(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-router-key")
+
+    def openai(_prompt, _payload):
+        calls.append("openai")
+        return {}
+
+    def openrouter(_prompt, _payload):
+        calls.append("openrouter")
+        return {
+            "score_overall": 77,
+            "classification": "B",
+            "classification_reason": "Perfil parcialmente aderente.",
+            "recommended_action": "Revisar antes do envio.",
+            "profile_summary": "Executivo comercial.",
+        }
+
+    monkeypatch.setattr("talent_intel_crm.activities.agents._openai_chat_json", openai)
+    monkeypatch.setattr("talent_intel_crm.activities.agents._openrouter_chat_json", openrouter)
+    monkeypatch.setattr("talent_intel_crm.activities.agents._tenant_metadata", lambda _payload: {})
+
+    result = classify_candidate_fit({"candidate_id": "candidate-001", "tenant_id": "tenant-001", "name": "Candidate One"})
+
+    assert calls == ["openrouter"]
+    assert result["endpoint"] == "openrouter"
 
 
 def test_openai_message_is_used_when_configured(monkeypatch) -> None:

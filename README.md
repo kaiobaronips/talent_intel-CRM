@@ -83,6 +83,7 @@ As activities usam `Supabase Postgres` como persistencia principal e webhooks op
 - `CANDIDATE_ENRICHMENT_WEBHOOK_URL`
 - `CANDIDATE_CLASSIFICATION_WEBHOOK_URL`
 - `OUTREACH_TEMPLATE_WEBHOOK_URL`
+- `LLM_PROVIDER` opcional: `openai` ou `openrouter`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL` default: `gpt-4.1-mini`
 - `OPENROUTER_API_KEY`
@@ -104,7 +105,7 @@ O lifecycle do candidato ja chama agentes operacionais em sequencia:
 4. envio por email e/ou LinkedIn
 
 Os webhooks podem ser conectados a provedores reais de sourcing, enriquecimento, LLM ou automacao de canal mantendo o mesmo contrato de workflow.
-Quando `OPENAI_API_KEY` ou `OPENROUTER_API_KEY` estiverem configuradas, as activities de classificacao e renderizacao de mensagem usam LLM diretamente antes de recorrer aos webhooks/dry-run. A ordem padrao e OpenAI primeiro e OpenRouter depois, com `deepseek/deepseek-v4-flash` como modelo fallback. A IA gera score, classificacao, justificativa, resumo e copy inicial; o envio continua bloqueado por aprovacao humana na UI.
+Quando `OPENAI_API_KEY` ou `OPENROUTER_API_KEY` estiverem configuradas, as activities de classificacao e renderizacao de mensagem usam LLM diretamente antes de recorrer aos webhooks/dry-run. A ordem padrao e OpenAI primeiro e OpenRouter depois, mas `LLM_PROVIDER=openrouter` prioriza o OpenRouter com `deepseek/deepseek-v4-flash`. A IA gera score, classificacao, justificativa, resumo e copy inicial; o envio continua bloqueado por aprovacao humana na UI.
 
 ## Cadencia
 
