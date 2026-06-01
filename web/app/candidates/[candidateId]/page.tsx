@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { CandidateJourney } from '@/components/CandidateJourney';
 import { DataTable } from '@/components/DataTable';
-import { InteractionStatusForms } from '@/components/InteractionStatusForms';
+import { InteractionContactCards } from '@/components/InteractionContactCards';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -57,6 +58,8 @@ export default async function CandidateDetailPage({ params }: CandidateDetailPag
         <MetricCard label="Situação" value={candidate.stage ?? 'Sem etapa'} detail="no funil" accent="blue" />
         <MetricCard label="Contatos pendentes" value={pendingContacts} detail={availableChannels.join(' + ') || 'sem canal'} accent="ink" />
       </section>
+
+      <CandidateJourney candidate={candidate} interactions={interactions} />
 
       <section className="grid gap-6 xl:grid-cols-[1fr_0.85fr]">
         <article className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
@@ -116,9 +119,11 @@ export default async function CandidateDetailPage({ params }: CandidateDetailPag
         </article>
       </section>
 
+      <InteractionContactCards interactions={interactions} tenantId={tenantId} />
+
       <DataTable<Interaction>
-        eyebrow="Cadência"
-        title="Contatos preparados pelos agentes"
+        eyebrow="Registro operacional"
+        title="Histórico completo de contatos"
         rows={interactions}
         emptyLabel="Nenhum contato preparado para este candidato."
         columns={[
@@ -128,7 +133,6 @@ export default async function CandidateDetailPage({ params }: CandidateDetailPag
           { key: 'next', label: 'Próxima ação', render: (row) => cleanValue(row.next_action) },
           { key: 'message', label: 'Mensagem preparada', render: (row) => cleanValue(row.message_sent) },
           { key: 'created', label: 'Criado em', render: (row) => formatDateTime(row.created_at) },
-          { key: 'actions', label: 'Ações', render: (row) => <InteractionStatusForms interaction={row} tenantId={tenantId} /> },
         ]}
       />
     </Shell>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ContextPanel } from '@/components/ContextPanel';
 import { DataTable } from '@/components/DataTable';
-import { InteractionStatusForms } from '@/components/InteractionStatusForms';
+import { InteractionContactCards } from '@/components/InteractionContactCards';
 import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -29,9 +29,11 @@ export default async function InteractionsPage() {
 
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={interactionsResult.offline || metricsResult.offline || principal.offline} />
 
+      <InteractionContactCards interactions={interactions} tenantId={tenantId} showCandidateLink />
+
       <DataTable<Interaction>
-        eyebrow="Cadência"
-        title="Abordagens planejadas"
+        eyebrow="Lista completa"
+        title="Registro de abordagens"
         rows={interactions}
         columns={[
           { key: 'candidate', label: 'Candidato', render: (row) => <Link href={`/candidates/${row.candidate_id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.candidate_name ?? row.candidate_id}</Link> },
@@ -40,7 +42,6 @@ export default async function InteractionsPage() {
           { key: 'next', label: 'Próxima ação', render: (row) => <StatusBadge value={row.next_action} /> },
           { key: 'sent', label: 'Mensagem', render: (row) => row.message_sent ?? '-' },
           { key: 'response', label: 'Resposta', render: (row) => row.response_received ?? '-' },
-          { key: 'actions', label: 'Ações', render: (row) => <InteractionStatusForms interaction={row} tenantId={tenantId} /> },
         ]}
       />
     </Shell>
