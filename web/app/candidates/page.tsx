@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CandidateCreateForm } from '@/components/ActionForms';
+import { ApolloCandidateSearchForm, CandidateCreateForm } from '@/components/ActionForms';
 import { CandidateTalentCards } from '@/components/CandidateTalentCards';
 import { ContextPanel } from '@/components/ContextPanel';
 import { DataTable } from '@/components/DataTable';
@@ -38,6 +38,8 @@ export default async function CandidatesPage() {
       <ContextPanel tenantId={tenantId} principal={principal.data} offline={tenantResult.offline || candidatesResult.offline || principal.offline} />
 
       <CandidateTalentCards candidates={candidates} />
+
+      <ApolloCandidateSearchForm tenantId={tenantId} />
 
       <CandidateCreateForm tenantId={tenantId} />
 

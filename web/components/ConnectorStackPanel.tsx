@@ -10,9 +10,9 @@ const connectors = [
     description: 'Complementa o Apollo com busca e verificação de e-mails profissionais antes de qualquer contato.',
   },
   {
-    name: 'OpenAI / Claude',
+    name: 'OpenAI / OpenRouter',
     role: 'Classificação e copy',
-    description: 'Gera score, justificativa, resumo do perfil e mensagens sugeridas para revisão humana.',
+    description: 'Gera score, justificativa, resumo do perfil e mensagens sugeridas para revisão humana. OpenRouter usa DeepSeek V4 Flash como opção operacional.',
   },
   {
     name: 'Expandi',

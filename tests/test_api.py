@@ -586,3 +586,61 @@ def test_tenant_message_templates_route(monkeypatch) -> None:
     assert templates["email_initial_subject"] == "Convite rápido"
     assert templates["email_follow_up_3_subject"] == "Encerrando contato"
     assert templates["linkedin_initial_message"] == "Obrigado por conectar."
+
+
+def test_apollo_search_reports_missing_configuration(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(
+        api,
+        "_apollo_people_search",
+        lambda _payload: {"configured": False, "people": [], "message": "APOLLO_API_KEY ainda não está configurada no serviço da API."},
+    )
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/sourcing/apollo/search",
+        json={"target_roles": "Executivo de contas", "locations": "São Paulo", "max_candidates": 5},
+    )
+
+    assert response.status_code == 202
+    data = response.json()["data"]
+    assert data["configured"] is False
+    assert data["created"] == []
+    assert "APOLLO_API_KEY" in data["message"]
+
+
+def test_apollo_search_starts_candidate_lifecycles(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(
+        api,
+        "_apollo_people_search",
+        lambda _payload: {
+            "configured": True,
+            "people": [
+                {
+                    "id": "person-001",
+                    "name": "Apollo Candidate",
+                    "title": "Account Executive",
+                    "city": "São Paulo",
+                    "linkedin_url": "https://linkedin.com/in/apollo-candidate",
+                    "organization": {"name": "Apollo Corp"},
+                }
+            ],
+        },
+    )
+
+    async def connect():
+        return FakeTemporalClient()
+
+    monkeypatch.setattr(api, "connect_temporal", connect)
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/sourcing/apollo/search",
+        json={"target_roles": "Account Executive", "locations": "São Paulo", "seniority": "Senior", "max_candidates": 5},
+    )
+
+    assert response.status_code == 202
+    data = response.json()["data"]
+    assert data["configured"] is True
+    assert len(data["created"]) == 1
+    assert data["created"][0]["channels"] == ["linkedin"]
+    assert data["created"][0]["workflow_id"].startswith("candidate-lifecycle::tenant-001::apollo-")

@@ -150,6 +150,48 @@ export async function createCandidateAction(_previousState: ActionState, formDat
   return { ok: true, message: `Candidato ${result.data?.candidate_id ?? name} enviado para análise dos agentes.` };
 }
 
+export async function searchApolloCandidatesAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const maxCandidates = Number(text(formData, 'max_candidates') || 10);
+
+  const result = await apiMutation<{
+    configured: boolean;
+    created: { candidate_id: string }[];
+    duplicates: string[];
+    skipped: { name: string; reason: string }[];
+    message: string;
+  }>(
+    `/v1/tenants/${tenantId}/sourcing/apollo/search`,
+    'POST',
+    {
+      target_roles: text(formData, 'target_roles'),
+      locations: text(formData, 'locations'),
+      seniority: text(formData, 'seniority'),
+      keywords: text(formData, 'keywords'),
+      industries: text(formData, 'industries'),
+      max_candidates: Number.isFinite(maxCandidates) ? maxCandidates : 10,
+    },
+    await authOptions(),
+  );
+
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateTenantViews(tenantId);
+  if (result.data?.configured === false) {
+    return { ok: false, message: result.data.message };
+  }
+
+  const created = result.data?.created.length ?? 0;
+  const duplicates = result.data?.duplicates.length ?? 0;
+  const skipped = result.data?.skipped.length ?? 0;
+  return {
+    ok: true,
+    message: `Apollo retornou ${created} candidato(s) enviados aos agentes. Duplicados: ${duplicates}. Sem canal útil: ${skipped}.`,
+  };
+}
+
 export async function createApiKeyAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
   const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
   const label = text(formData, 'label') || 'default';

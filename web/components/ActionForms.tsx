@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 import type { ActionState } from '@/app/actions';
-import { createApiKeyAction, createCandidateAction, createTenantAction, revokeApiKeyAction, rotateApiKeyAction } from '@/app/actions';
+import { createApiKeyAction, createCandidateAction, createTenantAction, revokeApiKeyAction, rotateApiKeyAction, searchApolloCandidatesAction } from '@/app/actions';
 
 const initialState: ActionState = { ok: false, message: '' };
 
@@ -97,6 +97,38 @@ export function CandidateCreateForm({ tenantId }: { tenantId: string }) {
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <SubmitButton>Iniciar análise dos agentes</SubmitButton>
+        <ActionFeedback state={state} />
+      </div>
+    </form>
+  );
+}
+
+export function ApolloCandidateSearchForm({ tenantId }: { tenantId: string }) {
+  const [state, action] = useActionState(searchApolloCandidatesAction, initialState);
+
+  return (
+    <form action={action} className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <input type="hidden" name="tenant_id" value={tenantId} />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase text-amber-700">Busca automática</p>
+          <h2 className="mt-2 font-display text-2xl font-black">Buscar candidatos no Apollo.io</h2>
+          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-stone-600">
+            Use esta busca para encontrar candidatos reais por cargo, região e palavras-chave. Os perfis encontrados entram na fila dos agentes para classificação e mensagens.
+          </p>
+        </div>
+        <SubmitButton>Buscar no Apollo</SubmitButton>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Field label="Cargos buscados" name="target_roles" placeholder="Account Executive, SDR, Head Comercial" required />
+        <Field label="Localização" name="locations" placeholder="São Paulo, Brasil, remoto" />
+        <Field label="Senioridade" name="seniority" placeholder="Pleno, senior, liderança" />
+        <Field label="Palavras-chave" name="keywords" placeholder="SaaS, outbound, enterprise, B2B" />
+        <Field label="Setores" name="industries" placeholder="Software, serviços financeiros" />
+        <Field label="Máximo de candidatos" name="max_candidates" type="number" defaultValue="10" />
+      </div>
+      <div className="mt-4">
         <ActionFeedback state={state} />
       </div>
     </form>

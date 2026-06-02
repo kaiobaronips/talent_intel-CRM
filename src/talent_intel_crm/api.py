@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import hashlib
 import time
+import urllib.error
+import urllib.request
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -39,6 +42,7 @@ from talent_intel_crm.db import (
     upsert_tenant_membership,
 )
 from talent_intel_crm.domain import CandidateChannel, CandidateStage, TenantTier
+from talent_intel_crm.support import env
 from talent_intel_crm.workflows import CandidateLifecycleWorkflow, TenantOnboardingWorkflow
 
 
@@ -149,6 +153,15 @@ class TenantMessageTemplatesRequest(BaseModel):
     response_follow_up_message: str = Field(default="", max_length=4000)
 
 
+class ApolloSearchRequest(BaseModel):
+    target_roles: str = Field(default="", max_length=1000)
+    locations: str = Field(default="", max_length=1000)
+    seniority: str = Field(default="", max_length=500)
+    keywords: str = Field(default="", max_length=1000)
+    industries: str = Field(default="", max_length=1000)
+    max_candidates: int = Field(default=10, ge=1, le=25)
+
+
 def _success(data: Dict[str, Any]) -> Dict[str, Any]:
     return {"success": True, "data": data}
 
@@ -175,6 +188,98 @@ def _candidate_channels(payload: CandidateCreateRequest) -> List[str]:
     if payload.linkedin_url:
         channels.append(CandidateChannel.LINKEDIN.value)
     return channels
+
+
+def _split_values(value: str) -> List[str]:
+    return [item.strip() for item in value.replace("\n", ",").split(",") if item.strip()]
+
+
+def _apollo_payload(payload: ApolloSearchRequest) -> Dict[str, Any]:
+    roles = _split_values(payload.target_roles)
+    locations = _split_values(payload.locations)
+    keywords = " ".join(_split_values(payload.keywords))
+    industries = _split_values(payload.industries)
+    request_payload: Dict[str, Any] = {
+        "page": 1,
+        "per_page": payload.max_candidates,
+    }
+    if roles:
+        request_payload["person_titles"] = roles
+    if locations:
+        request_payload["person_locations"] = locations
+    if keywords:
+        request_payload["q_keywords"] = keywords
+    if industries:
+        request_payload["organization_industry_tag_ids"] = industries
+    return request_payload
+
+
+def _apollo_people_search(payload: ApolloSearchRequest) -> Dict[str, Any]:
+    api_key = env("APOLLO_API_KEY")
+    if not api_key:
+        return {
+            "configured": False,
+            "people": [],
+            "message": "APOLLO_API_KEY ainda não está configurada no serviço da API.",
+        }
+    body = json.dumps(_apollo_payload(payload), ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.apollo.io/api/v1/mixed_people/api_search",
+        data=body,
+        method="POST",
+        headers={
+            "Cache-Control": "no-cache",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "x-api-key": api_key,
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8") if exc.fp else ""
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Apollo retornou HTTP {exc.code}: {raw[:300]}") from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Falha ao consultar Apollo.io") from exc
+
+    people = data.get("people") or data.get("contacts") or []
+    if not isinstance(people, list):
+        people = []
+    return {"configured": True, "people": [person for person in people if isinstance(person, dict)], "raw_count": len(people)}
+
+
+def _apollo_candidate_id(tenant_id: str, person: Dict[str, Any]) -> str:
+    stable = str(person.get("linkedin_url") or person.get("id") or person.get("email") or person.get("name") or uuid4().hex)
+    digest = hashlib.sha1(f"{tenant_id}:{stable}".encode("utf-8")).hexdigest()[:14]
+    return f"apollo-{digest}"
+
+
+def _candidate_from_apollo_person(tenant_id: str, person: Dict[str, Any], source_payload: ApolloSearchRequest) -> Dict[str, Any]:
+    organization = person.get("organization") if isinstance(person.get("organization"), dict) else {}
+    name = str(person.get("name") or "Candidato Apollo").strip()
+    email = str(person.get("email") or "").strip()
+    linkedin_url = str(person.get("linkedin_url") or person.get("linkedin_url_normalized") or "").strip()
+    return {
+        "candidate_id": _apollo_candidate_id(tenant_id, person),
+        "tenant_id": tenant_id,
+        "name": name,
+        "city": str(person.get("city") or "").strip(),
+        "email": email if "email_not_unlocked" not in email else "",
+        "linkedin_url": linkedin_url,
+        "channels": [channel for channel, value in ((CandidateChannel.EMAIL.value, email), (CandidateChannel.LINKEDIN.value, linkedin_url)) if value],
+        "source_page_id": str(person.get("id") or ""),
+        "stage": CandidateStage.INGESTED.value,
+        "metadata": {
+            "state": str(person.get("state") or person.get("country") or "").strip(),
+            "current_role": str(person.get("title") or "").strip(),
+            "current_company": str(organization.get("name") or person.get("organization_name") or "").strip(),
+            "seniority": source_payload.seniority,
+            "target_profile": source_payload.target_roles or source_payload.keywords,
+            "source": "apollo",
+            "apollo_person_id": str(person.get("id") or ""),
+        },
+    }
 
 
 def _candidate_projection(candidate: Dict[str, Any]) -> Dict[str, Any]:
@@ -426,6 +531,90 @@ async def update_tenant_message_templates(
         payload={"template_keys": list(message_templates.keys())},
     )
     return _success({"tenant_id": tenant_id, "tenant": tenant})
+
+
+@app.post("/v1/tenants/{tenant_id}/sourcing/apollo/search", status_code=status.HTTP_202_ACCEPTED)
+async def search_apollo_candidates(
+    tenant_id: str,
+    payload: ApolloSearchRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_tenant_admin(principal, tenant_id)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+
+    apollo_result = _apollo_people_search(payload)
+    if not apollo_result["configured"]:
+        _record_audit_event(
+            tenant_id=tenant_id,
+            event_type="sourcing.apollo_configuration_missing",
+            principal=principal,
+            payload={"criteria": payload.model_dump(), "provider": "apollo"},
+        )
+        return _success(
+            {
+                "tenant_id": tenant_id,
+                "provider": "apollo",
+                "configured": False,
+                "created": [],
+                "duplicates": [],
+                "message": apollo_result["message"],
+            }
+        )
+
+    client = await connect_temporal()
+    created: List[Dict[str, Any]] = []
+    duplicates: List[str] = []
+    skipped: List[Dict[str, str]] = []
+
+    for person in apollo_result["people"][: payload.max_candidates]:
+        candidate_payload = _candidate_from_apollo_person(tenant_id, person, payload)
+        if not candidate_payload["channels"]:
+            skipped.append({"name": candidate_payload["name"], "reason": "Sem e-mail ou LinkedIn retornado pela Apollo."})
+            continue
+        candidate_id = str(candidate_payload["candidate_id"])
+        try:
+            handle = await client.start_workflow(
+                CandidateLifecycleWorkflow.run,
+                candidate_payload,
+                id=f"candidate-lifecycle::{tenant_id}::{candidate_id}",
+                task_queue=TemporalConfig().task_queue,
+            )
+        except WorkflowAlreadyStartedError:
+            duplicates.append(candidate_id)
+            continue
+        created.append(
+            {
+                "candidate_id": candidate_id,
+                "name": candidate_payload["name"],
+                "channels": candidate_payload["channels"],
+                "workflow_id": handle.id,
+                "run_id": handle.result_run_id,
+            }
+        )
+
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="sourcing.apollo_search_requested",
+        principal=principal,
+        payload={
+            "criteria": payload.model_dump(),
+            "created": len(created),
+            "duplicates": len(duplicates),
+            "skipped": len(skipped),
+        },
+    )
+    return _success(
+        {
+            "tenant_id": tenant_id,
+            "provider": "apollo",
+            "configured": True,
+            "created": created,
+            "duplicates": duplicates,
+            "skipped": skipped,
+            "message": f"{len(created)} candidato(s) enviados para análise dos agentes.",
+        }
+    )
 
 
 @app.get("/v1/tenants/{tenant_id}/memberships")
