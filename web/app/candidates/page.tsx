@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ApolloCandidateSearchForm, CandidateCreateForm, HunterEnrichmentForm } from '@/components/ActionForms';
+import { ApolloCandidateSearchForm, ApolloEnrichmentForm, CandidateCreateForm, HunterEnrichmentForm } from '@/components/ActionForms';
 import { CandidateTalentCards } from '@/components/CandidateTalentCards';
 import { ContextPanel } from '@/components/ContextPanel';
 import { DataTable } from '@/components/DataTable';
@@ -40,6 +40,8 @@ export default async function CandidatesPage() {
       <CandidateTalentCards candidates={candidates} />
 
       <ApolloCandidateSearchForm tenantId={tenantId} />
+
+      <ApolloEnrichmentForm tenantId={tenantId} />
 
       <HunterEnrichmentForm tenantId={tenantId} />
 

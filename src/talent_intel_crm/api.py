@@ -164,6 +164,11 @@ class ApolloSearchRequest(BaseModel):
     max_candidates: int = Field(default=10, ge=1, le=25)
 
 
+class ApolloEnrichmentRequest(BaseModel):
+    candidate_ids: List[str] = Field(default_factory=list, max_length=25)
+    max_candidates: int = Field(default=10, ge=1, le=25)
+
+
 class HunterEnrichmentRequest(BaseModel):
     candidate_ids: List[str] = Field(default_factory=list, max_length=25)
     max_candidates: int = Field(default=10, ge=1, le=25)
@@ -254,6 +259,64 @@ def _apollo_people_search(payload: ApolloSearchRequest) -> Dict[str, Any]:
     if not isinstance(people, list):
         people = []
     return {"configured": True, "people": [person for person in people if isinstance(person, dict)], "raw_count": len(people)}
+
+
+def _apollo_people_match(apollo_person_id: str) -> Dict[str, Any]:
+    api_key = env("APOLLO_API_KEY")
+    if not api_key:
+        return {
+            "configured": False,
+            "person": {},
+            "message": "APOLLO_API_KEY ainda não está configurada no serviço da API.",
+        }
+    body = json.dumps(
+        {
+            "id": apollo_person_id,
+            "reveal_personal_emails": False,
+            "reveal_phone_number": False,
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.apollo.io/api/v1/people/match",
+        data=body,
+        method="POST",
+        headers={
+            "Cache-Control": "no-cache",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "x-api-key": api_key,
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8") if exc.fp else ""
+        if exc.code == 404:
+            return {"configured": True, "person": {}, "status": "not_found", "message": "Apollo não encontrou dados adicionais para este candidato."}
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Apollo retornou HTTP {exc.code}: {raw[:300]}") from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Falha ao consultar Apollo.io") from exc
+
+    person = data.get("person") or data.get("contact") or data.get("data") or {}
+    if not isinstance(person, dict):
+        person = {}
+    return {"configured": True, "person": person, "status": "found" if person else "not_found"}
+
+
+def _apollo_person_company(person: Dict[str, Any]) -> Dict[str, str]:
+    organization = person.get("organization") if isinstance(person.get("organization"), dict) else {}
+    account = person.get("account") if isinstance(person.get("account"), dict) else {}
+    return {
+        "name": str(organization.get("name") or account.get("name") or person.get("organization_name") or "").strip(),
+        "domain": str(organization.get("website_url") or organization.get("primary_domain") or account.get("website_url") or account.get("domain") or "").strip(),
+    }
+
+
+def _professional_email(value: Any) -> str:
+    email = str(value or "").strip()
+    return email if email and "email_not_unlocked" not in email else ""
 
 
 def _hunter_get(path: str, params: Dict[str, str]) -> Dict[str, Any]:
@@ -709,8 +772,8 @@ async def search_apollo_candidates(
                     "external_id": candidate_id,
                     "metadata": {
                         **candidate_payload["metadata"],
-                        "apollo_status": "discovered_without_contact_channel",
-                        "recommended_next_step": "Conectar Hunter.io para encontrar e validar e-mail profissional.",
+                            "apollo_status": "discovered_without_contact_channel",
+                            "recommended_next_step": "Completar dados no Apollo antes de chamar Hunter.io.",
                     },
                 }
             )
@@ -769,6 +832,200 @@ async def search_apollo_candidates(
     )
 
 
+@app.post("/v1/tenants/{tenant_id}/sourcing/apollo/enrich", status_code=status.HTTP_202_ACCEPTED)
+async def enrich_apollo_candidates(
+    tenant_id: str,
+    payload: ApolloEnrichmentRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_tenant_admin(principal, tenant_id)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+
+    if payload.candidate_ids:
+        candidates = [candidate for candidate_id in payload.candidate_ids if (candidate := get_candidate(candidate_id))]
+    else:
+        result = list_tenant_candidates(tenant_id, 1, payload.max_candidates)
+        candidates = result.get("items", [])
+
+    if not env("APOLLO_API_KEY"):
+        _record_audit_event(
+            tenant_id=tenant_id,
+            event_type="sourcing.apollo_enrichment_configuration_missing",
+            principal=principal,
+            payload={"candidate_ids": [candidate.get("id") for candidate in candidates], "provider": "apollo"},
+        )
+        return _success(
+            {
+                "tenant_id": tenant_id,
+                "provider": "apollo",
+                "configured": False,
+                "enriched": [],
+                "started": [],
+                "pending": [],
+                "duplicates": [],
+                "message": "APOLLO_API_KEY ainda não está configurada no serviço da API.",
+            }
+        )
+
+    temporal_client = None
+    enriched: List[Dict[str, Any]] = []
+    started: List[Dict[str, str]] = []
+    pending: List[Dict[str, str]] = []
+    duplicates: List[str] = []
+
+    for raw_candidate in candidates[: payload.max_candidates]:
+        candidate = _candidate_projection(raw_candidate)
+        candidate_id = str(candidate.get("id") or "")
+        if not candidate_id:
+            continue
+        metadata = candidate.get("metadata_json") or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        if metadata.get("source") != "apollo":
+            pending.append({"candidate_id": candidate_id, "status": "not_apollo", "reason": "Candidato não veio do Apollo."})
+            continue
+
+        apollo_person_id = str(metadata.get("apollo_person_id") or candidate.get("source_page_id") or "").strip()
+        if not apollo_person_id:
+            update_candidate_state(
+                candidate_id,
+                str(candidate.get("stage") or CandidateStage.INGESTED.value),
+                {"apollo_enrichment_status": "missing_person_id", "apollo_enrichment_reason": "Candidato não tem apollo_person_id."},
+            )
+            pending.append({"candidate_id": candidate_id, "status": "missing_person_id", "reason": "Candidato não tem apollo_person_id."})
+            continue
+
+        match = _apollo_people_match(apollo_person_id)
+        if match.get("configured") is False:
+            return _success(
+                {
+                    "tenant_id": tenant_id,
+                    "provider": "apollo",
+                    "configured": False,
+                    "enriched": enriched,
+                    "started": started,
+                    "pending": pending,
+                    "duplicates": duplicates,
+                    "message": match.get("message", "APOLLO_API_KEY ainda não está configurada no serviço da API."),
+                }
+            )
+        person = match.get("person") if isinstance(match.get("person"), dict) else {}
+        if not person:
+            update_candidate_state(
+                candidate_id,
+                str(candidate.get("stage") or CandidateStage.INGESTED.value),
+                {
+                    "apollo_enrichment_status": "not_found",
+                    "apollo_enrichment_reason": match.get("message", "Apollo não encontrou dados adicionais."),
+                    "needs_contact_enrichment": True,
+                },
+            )
+            pending.append({"candidate_id": candidate_id, "status": "not_found", "reason": "Apollo não encontrou dados adicionais."})
+            continue
+
+        company = _apollo_person_company(person)
+        name = str(person.get("name") or candidate.get("name") or "").strip()
+        current_company = company["name"] or str(metadata.get("current_company") or "").strip()
+        current_role = str(person.get("title") or metadata.get("current_role") or "").strip()
+        email = _professional_email(person.get("email") or candidate.get("email"))
+        linkedin_url = str(person.get("linkedin_url") or person.get("linkedin_url_normalized") or candidate.get("linkedin_url") or "").strip()
+        company_domain = company["domain"].removeprefix("https://").removeprefix("http://").split("/", 1)[0]
+        channels = [channel for channel, value in ((CandidateChannel.EMAIL.value, email), (CandidateChannel.LINKEDIN.value, linkedin_url)) if value]
+        full_name = _candidate_person_name(name)
+        ready_for_hunter = bool(full_name and (company_domain or current_company or linkedin_url))
+        updated_metadata = {
+            **metadata,
+            "apollo_status": "enriched",
+            "apollo_enrichment_status": "found",
+            "apollo_person_id": apollo_person_id,
+            "apollo_first_name": str(person.get("first_name") or "").strip(),
+            "apollo_last_name": str(person.get("last_name") or "").strip(),
+            "current_role": current_role,
+            "current_company": current_company,
+            "company_domain": company_domain,
+            "needs_contact_enrichment": not bool(channels),
+            "ready_for_hunter": ready_for_hunter and not bool(email),
+            "recommended_next_step": "Rodar Hunter.io para encontrar e validar e-mail profissional." if ready_for_hunter and not channels else "",
+        }
+        upsert_candidate(
+            {
+                "candidate_id": candidate_id,
+                "tenant_id": tenant_id,
+                "external_id": candidate.get("external_id") or candidate_id,
+                "name": name or candidate_id,
+                "city": str(person.get("city") or candidate.get("city") or "").strip(),
+                "email": email,
+                "linkedin_url": linkedin_url,
+                "source_page_id": candidate.get("source_page_id") or apollo_person_id,
+                "stage": str(candidate.get("stage") or CandidateStage.INGESTED.value),
+                "metadata": updated_metadata,
+            }
+        )
+        enriched.append({"candidate_id": candidate_id, "name": name or candidate_id, "channels": channels, "ready_for_hunter": ready_for_hunter})
+
+        if not channels:
+            pending.append(
+                {
+                    "candidate_id": candidate_id,
+                    "status": "ready_for_hunter" if ready_for_hunter else "still_missing_contact",
+                    "reason": "Dados suficientes para Hunter." if ready_for_hunter else "Apollo completou o perfil, mas ainda falta canal e dados suficientes.",
+                }
+            )
+            continue
+
+        workflow_payload = {
+            "candidate_id": candidate_id,
+            "tenant_id": tenant_id,
+            "name": name or candidate_id,
+            "city": str(person.get("city") or candidate.get("city") or "").strip(),
+            "email": email,
+            "linkedin_url": linkedin_url,
+            "channels": channels,
+            "source_page_id": candidate.get("source_page_id") or apollo_person_id,
+            "stage": CandidateStage.INGESTED.value,
+            "metadata": updated_metadata,
+        }
+        try:
+            if temporal_client is None:
+                temporal_client = await connect_temporal()
+            handle = await temporal_client.start_workflow(
+                CandidateLifecycleWorkflow.run,
+                workflow_payload,
+                id=f"candidate-lifecycle::{tenant_id}::{candidate_id}",
+                task_queue=TemporalConfig().task_queue,
+            )
+        except WorkflowAlreadyStartedError:
+            duplicates.append(candidate_id)
+        else:
+            started.append({"candidate_id": candidate_id, "workflow_id": handle.id, "run_id": handle.result_run_id})
+
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="sourcing.apollo_enrichment_requested",
+        principal=principal,
+        payload={
+            "candidate_ids": [candidate.get("id") for candidate in candidates],
+            "enriched": len(enriched),
+            "started": len(started),
+            "pending": len(pending),
+            "duplicates": len(duplicates),
+        },
+    )
+    return _success(
+        {
+            "tenant_id": tenant_id,
+            "provider": "apollo",
+            "configured": True,
+            "enriched": enriched,
+            "started": started,
+            "pending": pending,
+            "duplicates": duplicates,
+            "message": f"Apollo completou {len(enriched)} candidato(s), iniciou {len(started)} fluxo(s) e deixou {len(pending)} pendente(s).",
+        }
+    )
+
+
 @app.post("/v1/tenants/{tenant_id}/enrichment/hunter/run", status_code=status.HTTP_202_ACCEPTED)
 async def run_hunter_enrichment(
     tenant_id: str,
@@ -809,6 +1066,8 @@ async def run_hunter_enrichment(
     started: List[Dict[str, str]] = []
     pending: List[Dict[str, str]] = []
     duplicates: List[str] = []
+    already_ready = 0
+    insufficient_data = 0
 
     for raw_candidate in candidates[: payload.max_candidates]:
         candidate = _candidate_projection(raw_candidate)
@@ -820,6 +1079,7 @@ async def run_hunter_enrichment(
             metadata = {}
 
         if candidate.get("email") and not metadata.get("needs_contact_enrichment"):
+            already_ready += 1
             pending.append({"candidate_id": candidate_id, "status": "already_ready", "reason": "Candidato já possui e-mail operacional."})
             continue
 
@@ -838,6 +1098,8 @@ async def run_hunter_enrichment(
             )
 
         if hunter_result.get("status") != "found" or not hunter_result.get("email"):
+            if hunter_result.get("status") == "insufficient_data":
+                insufficient_data += 1
             update_candidate_state(
                 candidate_id,
                 str(candidate.get("stage") or CandidateStage.INGESTED.value),
@@ -934,7 +1196,9 @@ async def run_hunter_enrichment(
             "started": started,
             "pending": pending,
             "duplicates": duplicates,
-            "message": f"Hunter enriqueceu {len(enriched)} candidato(s), iniciou {len(started)} fluxo(s) e manteve {len(pending)} pendente(s).",
+            "already_ready": already_ready,
+            "insufficient_data": insufficient_data,
+            "message": f"Hunter enriqueceu {len(enriched)} candidato(s), iniciou {len(started)} fluxo(s), encontrou {already_ready} já pronto(s) e manteve {insufficient_data} sem dados suficientes.",
         }
     )
 

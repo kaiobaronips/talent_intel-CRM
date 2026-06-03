@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 import type { ActionState } from '@/app/actions';
-import { createApiKeyAction, createCandidateAction, createTenantAction, revokeApiKeyAction, rotateApiKeyAction, runHunterEnrichmentAction, searchApolloCandidatesAction } from '@/app/actions';
+import { createApiKeyAction, createCandidateAction, createTenantAction, enrichApolloCandidatesAction, revokeApiKeyAction, rotateApiKeyAction, runHunterEnrichmentAction, searchApolloCandidatesAction } from '@/app/actions';
 
 const initialState: ActionState = { ok: false, message: '' };
 
@@ -141,6 +141,34 @@ export function ApolloCandidateSearchForm({ tenantId }: { tenantId: string }) {
         <Field label="Palavras-chave" name="keywords" placeholder="SaaS, outbound, enterprise, B2B" />
         <Field label="Setores" name="industries" placeholder="Software, serviços financeiros" />
         <Field label="Máximo de candidatos" name="max_candidates" type="number" defaultValue="10" />
+      </div>
+      <div className="mt-4">
+        <ActionFeedback state={state} />
+      </div>
+    </form>
+  );
+}
+
+export function ApolloEnrichmentForm({ tenantId }: { tenantId: string }) {
+  const [state, action] = useActionState(enrichApolloCandidatesAction, initialState);
+
+  return (
+    <form action={action} className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <input type="hidden" name="tenant_id" value={tenantId} />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase text-amber-700">Complementar perfis</p>
+          <h2 className="mt-2 font-display text-2xl font-black">Completar dados do Apollo</h2>
+          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-stone-600">
+            Use depois da busca inicial. Esta etapa tenta preencher nome, LinkedIn, empresa e domínio antes de chamar o Hunter.
+          </p>
+        </div>
+        <SubmitButton>Completar Apollo</SubmitButton>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-[220px_1fr]">
+        <Field label="Máximo de candidatos" name="max_candidates" type="number" defaultValue="10" />
+        <TextAreaField label="IDs específicos opcionais" name="candidate_ids" placeholder="Um ID por linha ou separados por vírgula" />
       </div>
       <div className="mt-4">
         <ActionFeedback state={state} />

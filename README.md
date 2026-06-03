@@ -111,6 +111,8 @@ Quando `OPENAI_API_KEY` ou `OPENROUTER_API_KEY` estiverem configuradas, as activ
 
 A rota `POST /v1/tenants/{tenant_id}/sourcing/apollo/search` consulta Apollo.io quando `APOLLO_API_KEY` esta configurada. Ela cria workflows de candidato para perfis com e-mail ou LinkedIn retornados pela Apollo; quando a chave nao existe, retorna uma mensagem clara de configuracao pendente sem criar candidatos.
 
+A rota `POST /v1/tenants/{tenant_id}/sourcing/apollo/enrich` usa o `apollo_person_id` salvo na busca para completar nome, LinkedIn, empresa e dominio antes da chamada ao Hunter. Se a Apollo devolver e-mail ou LinkedIn, o lifecycle dos agentes pode iniciar diretamente; se devolver apenas nome e dominio, o candidato fica pronto para Hunter.
+
 A rota `POST /v1/tenants/{tenant_id}/enrichment/hunter/run` consulta Hunter.io quando `HUNTER_API_KEY` esta configurada. Ela encontra e-mails profissionais para candidatos pendentes de contato e inicia o lifecycle dos agentes apenas quando existe canal valido. Candidatos sem nome completo, dominio da empresa ou LinkedIn ficam marcados como pendentes de dados.
 
 ## Cadencia

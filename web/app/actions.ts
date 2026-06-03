@@ -194,6 +194,51 @@ export async function searchApolloCandidatesAction(_previousState: ActionState, 
   };
 }
 
+export async function enrichApolloCandidatesAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const maxCandidates = Number(text(formData, 'max_candidates') || 10);
+  const candidateIds = text(formData, 'candidate_ids')
+    .split(/[\n,]/)
+    .map((candidateId) => candidateId.trim())
+    .filter(Boolean);
+
+  const result = await apiMutation<{
+    configured: boolean;
+    enriched: { candidate_id: string }[];
+    started: { candidate_id: string }[];
+    pending: { candidate_id: string; status: string }[];
+    duplicates: string[];
+    message: string;
+  }>(
+    `/v1/tenants/${tenantId}/sourcing/apollo/enrich`,
+    'POST',
+    {
+      candidate_ids: candidateIds,
+      max_candidates: Number.isFinite(maxCandidates) ? maxCandidates : 10,
+    },
+    await authOptions(),
+  );
+
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateTenantViews(tenantId);
+  if (result.data?.configured === false) {
+    return { ok: false, message: result.data.message };
+  }
+
+  const enriched = result.data?.enriched.length ?? 0;
+  const started = result.data?.started.length ?? 0;
+  const readyForHunter = result.data?.pending.filter((item) => item.status === 'ready_for_hunter').length ?? 0;
+  const pending = result.data?.pending.length ?? 0;
+  const duplicates = result.data?.duplicates.length ?? 0;
+  return {
+    ok: true,
+    message: `Apollo completou ${enriched} candidato(s), iniciou ${started} fluxo(s), deixou ${readyForHunter} pronto(s) para Hunter, ${pending} pendente(s) no total e ${duplicates} duplicado(s).`,
+  };
+}
+
 export async function runHunterEnrichmentAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
   const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
   const maxCandidates = Number(text(formData, 'max_candidates') || 10);
@@ -208,6 +253,8 @@ export async function runHunterEnrichmentAction(_previousState: ActionState, for
     started: { candidate_id: string }[];
     pending: { candidate_id: string; reason: string }[];
     duplicates: string[];
+    already_ready: number;
+    insufficient_data: number;
     message: string;
   }>(
     `/v1/tenants/${tenantId}/enrichment/hunter/run`,
@@ -230,11 +277,12 @@ export async function runHunterEnrichmentAction(_previousState: ActionState, for
 
   const enriched = result.data?.enriched.length ?? 0;
   const started = result.data?.started.length ?? 0;
-  const pending = result.data?.pending.length ?? 0;
+  const alreadyReady = result.data?.already_ready ?? 0;
+  const insufficientData = result.data?.insufficient_data ?? 0;
   const duplicates = result.data?.duplicates.length ?? 0;
   return {
     ok: true,
-    message: `Hunter enriqueceu ${enriched} candidato(s), iniciou ${started} fluxo(s), manteve ${pending} pendente(s) e encontrou ${duplicates} fluxo(s) já iniciado(s).`,
+    message: `Hunter enriqueceu ${enriched} candidato(s), iniciou ${started} fluxo(s), encontrou ${alreadyReady} já pronto(s), manteve ${insufficientData} sem dados suficientes e encontrou ${duplicates} fluxo(s) já iniciado(s).`,
   };
 }
 
