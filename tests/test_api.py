@@ -685,3 +685,104 @@ def test_apollo_search_stages_profiles_without_contact_channel(monkeypatch) -> N
     assert data["staged"][0]["name"] == "Apollo - Preview Corp"
     assert staged_payloads[0]["metadata"]["needs_contact_enrichment"] is True
     assert staged_payloads[0]["metadata"]["recommended_next_step"] == "Conectar Hunter.io para encontrar e validar e-mail profissional."
+
+
+def test_hunter_enrichment_reports_missing_configuration(monkeypatch) -> None:
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "env", lambda key, default="": "" if key == "HUNTER_API_KEY" else default)
+    monkeypatch.setattr(api, "list_tenant_candidates", lambda _tenant_id, _page, _limit: {"items": [], "total": 0})
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/enrichment/hunter/run",
+        json={"max_candidates": 3},
+    )
+
+    assert response.status_code == 202
+    data = response.json()["data"]
+    assert data["configured"] is False
+    assert "HUNTER_API_KEY" in data["message"]
+
+
+def test_hunter_enrichment_marks_insufficient_data(monkeypatch) -> None:
+    updates: list[tuple[str, str, dict[str, object]]] = []
+    candidate = {
+        "id": "apollo-001",
+        "tenant_id": "tenant-001",
+        "name": "Apollo - Preview Corp",
+        "email": "",
+        "linkedin_url": "",
+        "stage": "ingested",
+        "metadata_json": {"current_company": "Preview Corp", "needs_contact_enrichment": True},
+    }
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "env", lambda key, default="": "hunter-key" if key == "HUNTER_API_KEY" else default)
+    monkeypatch.setattr(api, "list_tenant_candidates", lambda _tenant_id, _page, _limit: {"items": [candidate], "total": 1})
+    monkeypatch.setattr(api, "update_candidate_state", lambda candidate_id, stage, metadata_updates: updates.append((candidate_id, stage, metadata_updates)) or candidate)
+
+    async def connect():
+        return FakeTemporalClient()
+
+    monkeypatch.setattr(api, "connect_temporal", connect)
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/enrichment/hunter/run",
+        json={"max_candidates": 3},
+    )
+
+    assert response.status_code == 202
+    data = response.json()["data"]
+    assert data["configured"] is True
+    assert data["enriched"] == []
+    assert data["pending"][0]["status"] == "insufficient_data"
+    assert updates[0][2]["needs_contact_enrichment"] is True
+
+
+def test_hunter_enrichment_updates_candidate_and_starts_lifecycle(monkeypatch) -> None:
+    upserts: list[dict[str, object]] = []
+    candidate = {
+        "id": "candidate-001",
+        "tenant_id": "tenant-001",
+        "external_id": "candidate-001",
+        "name": "Candidate One",
+        "city": "São Paulo",
+        "email": "",
+        "linkedin_url": "https://linkedin.com/in/candidate-one",
+        "stage": "ingested",
+        "source_page_id": "person-001",
+        "metadata_json": {"current_company": "Candidate Corp", "needs_contact_enrichment": True},
+    }
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "env", lambda key, default="": "hunter-key" if key == "HUNTER_API_KEY" else default)
+    monkeypatch.setattr(api, "list_tenant_candidates", lambda _tenant_id, _page, _limit: {"items": [candidate], "total": 1})
+    monkeypatch.setattr(
+        api,
+        "_hunter_email_finder",
+        lambda _candidate: {
+            "configured": True,
+            "status": "found",
+            "email": "candidate.one@example.com",
+            "score": 92,
+            "domain": "example.com",
+            "company": "Candidate Corp",
+            "verification_status": "valid",
+        },
+    )
+    monkeypatch.setattr(api, "upsert_candidate", lambda payload: upserts.append(payload) or {"id": payload["candidate_id"]})
+
+    async def connect():
+        return FakeTemporalClient()
+
+    monkeypatch.setattr(api, "connect_temporal", connect)
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/enrichment/hunter/run",
+        json={"max_candidates": 3},
+    )
+
+    assert response.status_code == 202
+    data = response.json()["data"]
+    assert data["enriched"][0]["email"] == "candidate.one@example.com"
+    assert data["started"][0]["workflow_id"] == "candidate-lifecycle::tenant-001::candidate-001"
+    assert upserts[0]["email"] == "candidate.one@example.com"
+    assert upserts[0]["metadata"]["hunter_status"] == "found"
+    assert upserts[0]["metadata"]["needs_contact_enrichment"] is False

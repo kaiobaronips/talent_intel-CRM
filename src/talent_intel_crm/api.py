@@ -5,6 +5,7 @@ import logging
 import hashlib
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -163,6 +164,11 @@ class ApolloSearchRequest(BaseModel):
     max_candidates: int = Field(default=10, ge=1, le=25)
 
 
+class HunterEnrichmentRequest(BaseModel):
+    candidate_ids: List[str] = Field(default_factory=list, max_length=25)
+    max_candidates: int = Field(default=10, ge=1, le=25)
+
+
 def _success(data: Dict[str, Any]) -> Dict[str, Any]:
     return {"success": True, "data": data}
 
@@ -248,6 +254,120 @@ def _apollo_people_search(payload: ApolloSearchRequest) -> Dict[str, Any]:
     if not isinstance(people, list):
         people = []
     return {"configured": True, "people": [person for person in people if isinstance(person, dict)], "raw_count": len(people)}
+
+
+def _hunter_get(path: str, params: Dict[str, str]) -> Dict[str, Any]:
+    api_key = env("HUNTER_API_KEY")
+    if not api_key:
+        return {
+            "configured": False,
+            "data": {},
+            "message": "HUNTER_API_KEY ainda não está configurada no serviço da API.",
+        }
+    query = urllib.parse.urlencode({**params, "api_key": api_key})
+    request = urllib.request.Request(
+        f"https://api.hunter.io/v2/{path}?{query}",
+        method="GET",
+        headers={"Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8") if exc.fp else ""
+        if exc.code == 404:
+            return {"configured": True, "data": {}, "not_found": True}
+        if exc.code == 451:
+            return {"configured": True, "data": {}, "blocked": True, "message": "Hunter bloqueou o processamento deste contato por solicitação do titular."}
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Hunter.io retornou HTTP {exc.code}: {raw[:300]}") from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Falha ao consultar Hunter.io") from exc
+    return {"configured": True, "data": data.get("data") if isinstance(data, dict) else {}}
+
+
+def _linkedin_handle(linkedin_url: str) -> str:
+    value = linkedin_url.strip().strip("/")
+    if not value:
+        return ""
+    if "linkedin.com/in/" in value:
+        return value.rsplit("/in/", 1)[-1].split("/", 1)[0].strip()
+    if value.startswith("in/"):
+        return value.split("/", 1)[-1].strip()
+    return value if "/" not in value and "." not in value else ""
+
+
+def _candidate_person_name(name: str) -> str:
+    clean_name = " ".join(name.strip().split())
+    if not clean_name or clean_name.lower().startswith("apollo - "):
+        return ""
+    return clean_name if len(clean_name.split()) >= 2 else ""
+
+
+def _candidate_company_domain(candidate: Dict[str, Any], metadata: Dict[str, Any]) -> str:
+    domain = str(metadata.get("company_domain") or metadata.get("domain") or metadata.get("organization_domain") or "").strip()
+    if domain:
+        return domain.removeprefix("https://").removeprefix("http://").split("/", 1)[0]
+    return ""
+
+
+def _hunter_email_finder(candidate: Dict[str, Any]) -> Dict[str, Any]:
+    metadata = candidate.get("metadata_json") or {}
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except json.JSONDecodeError:
+            metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    linkedin_handle = _linkedin_handle(str(candidate.get("linkedin_url") or ""))
+    full_name = _candidate_person_name(str(candidate.get("name") or ""))
+    company = str(metadata.get("current_company") or "").strip()
+    domain = _candidate_company_domain(candidate, metadata)
+
+    params: Dict[str, str] = {"max_duration": "10"}
+    if linkedin_handle:
+        params["linkedin_handle"] = linkedin_handle
+    else:
+        if not full_name:
+            return {
+                "configured": True,
+                "status": "insufficient_data",
+                "message": "Hunter precisa de nome completo do candidato ou handle do LinkedIn.",
+            }
+        if not domain and not company:
+            return {
+                "configured": True,
+                "status": "insufficient_data",
+                "message": "Hunter precisa de domínio ou nome da empresa para buscar e-mail.",
+            }
+        params["full_name"] = full_name
+        if domain:
+            params["domain"] = domain
+        else:
+            params["company"] = company
+
+    result = _hunter_get("email-finder", params)
+    if not result.get("configured"):
+        return result
+    if result.get("blocked"):
+        return {"configured": True, "status": "blocked", "message": result.get("message", "")}
+    data = result.get("data") or {}
+    if not isinstance(data, dict) or not data.get("email"):
+        return {"configured": True, "status": "not_found", "message": "Hunter não encontrou e-mail profissional para este candidato."}
+
+    verification = data.get("verification") if isinstance(data.get("verification"), dict) else {}
+    return {
+        "configured": True,
+        "status": "found",
+        "email": str(data.get("email") or "").strip(),
+        "score": data.get("score"),
+        "domain": str(data.get("domain") or domain).strip(),
+        "company": str(data.get("company") or company).strip(),
+        "position": str(data.get("position") or "").strip(),
+        "linkedin_url": str(data.get("linkedin_url") or candidate.get("linkedin_url") or "").strip(),
+        "verification_status": str(verification.get("status") or "").strip(),
+    }
 
 
 def _apollo_candidate_id(tenant_id: str, person: Dict[str, Any]) -> str:
@@ -645,6 +765,176 @@ async def search_apollo_candidates(
             "duplicates": duplicates,
             "skipped": skipped,
             "message": f"{len(created)} candidato(s) enviados para análise dos agentes e {len(staged)} salvo(s) para enriquecimento de contato.",
+        }
+    )
+
+
+@app.post("/v1/tenants/{tenant_id}/enrichment/hunter/run", status_code=status.HTTP_202_ACCEPTED)
+async def run_hunter_enrichment(
+    tenant_id: str,
+    payload: HunterEnrichmentRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_tenant_admin(principal, tenant_id)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+
+    if payload.candidate_ids:
+        candidates = [candidate for candidate_id in payload.candidate_ids if (candidate := get_candidate(candidate_id))]
+    else:
+        result = list_tenant_candidates(tenant_id, 1, payload.max_candidates)
+        candidates = result.get("items", [])
+
+    if not env("HUNTER_API_KEY"):
+        _record_audit_event(
+            tenant_id=tenant_id,
+            event_type="enrichment.hunter_configuration_missing",
+            principal=principal,
+            payload={"candidate_ids": [candidate.get("id") for candidate in candidates], "provider": "hunter"},
+        )
+        return _success(
+            {
+                "tenant_id": tenant_id,
+                "provider": "hunter",
+                "configured": False,
+                "enriched": [],
+                "started": [],
+                "pending": [],
+                "message": "HUNTER_API_KEY ainda não está configurada no serviço da API.",
+            }
+        )
+
+    temporal_client = None
+    enriched: List[Dict[str, Any]] = []
+    started: List[Dict[str, str]] = []
+    pending: List[Dict[str, str]] = []
+    duplicates: List[str] = []
+
+    for raw_candidate in candidates[: payload.max_candidates]:
+        candidate = _candidate_projection(raw_candidate)
+        candidate_id = str(candidate.get("id") or "")
+        if not candidate_id:
+            continue
+        metadata = candidate.get("metadata_json") or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        if candidate.get("email") and not metadata.get("needs_contact_enrichment"):
+            pending.append({"candidate_id": candidate_id, "status": "already_ready", "reason": "Candidato já possui e-mail operacional."})
+            continue
+
+        hunter_result = _hunter_email_finder(candidate)
+        if hunter_result.get("configured") is False:
+            return _success(
+                {
+                    "tenant_id": tenant_id,
+                    "provider": "hunter",
+                    "configured": False,
+                    "enriched": enriched,
+                    "started": started,
+                    "pending": pending,
+                    "message": hunter_result.get("message", "HUNTER_API_KEY ainda não está configurada no serviço da API."),
+                }
+            )
+
+        if hunter_result.get("status") != "found" or not hunter_result.get("email"):
+            update_candidate_state(
+                candidate_id,
+                str(candidate.get("stage") or CandidateStage.INGESTED.value),
+                {
+                    "hunter_status": hunter_result.get("status", "not_found"),
+                    "hunter_reason": hunter_result.get("message", ""),
+                    "needs_contact_enrichment": True,
+                },
+            )
+            pending.append(
+                {
+                    "candidate_id": candidate_id,
+                    "status": str(hunter_result.get("status") or "not_found"),
+                    "reason": str(hunter_result.get("message") or "Hunter não encontrou e-mail profissional."),
+                }
+            )
+            continue
+
+        email = str(hunter_result["email"])
+        linkedin_url = str(hunter_result.get("linkedin_url") or candidate.get("linkedin_url") or "")
+        updated_metadata = {
+            **metadata,
+            "hunter_status": "found",
+            "hunter_email": email,
+            "hunter_score": hunter_result.get("score"),
+            "hunter_domain": hunter_result.get("domain", ""),
+            "hunter_company": hunter_result.get("company", ""),
+            "hunter_position": hunter_result.get("position", ""),
+            "hunter_verification_status": hunter_result.get("verification_status", ""),
+            "needs_contact_enrichment": False,
+        }
+        upsert_candidate(
+            {
+                "candidate_id": candidate_id,
+                "tenant_id": tenant_id,
+                "external_id": candidate.get("external_id") or candidate_id,
+                "name": candidate.get("name") or email,
+                "city": candidate.get("city") or "",
+                "email": email,
+                "linkedin_url": linkedin_url,
+                "source_page_id": candidate.get("source_page_id"),
+                "stage": str(candidate.get("stage") or CandidateStage.INGESTED.value),
+                "metadata": updated_metadata,
+            }
+        )
+        channels = [CandidateChannel.EMAIL.value]
+        if linkedin_url:
+            channels.append(CandidateChannel.LINKEDIN.value)
+        workflow_payload = {
+            "candidate_id": candidate_id,
+            "tenant_id": tenant_id,
+            "name": candidate.get("name") or email,
+            "city": candidate.get("city") or "",
+            "email": email,
+            "linkedin_url": linkedin_url,
+            "channels": channels,
+            "source_page_id": candidate.get("source_page_id"),
+            "stage": CandidateStage.INGESTED.value,
+            "metadata": updated_metadata,
+        }
+        try:
+            if temporal_client is None:
+                temporal_client = await connect_temporal()
+            handle = await temporal_client.start_workflow(
+                CandidateLifecycleWorkflow.run,
+                workflow_payload,
+                id=f"candidate-lifecycle::{tenant_id}::{candidate_id}",
+                task_queue=TemporalConfig().task_queue,
+            )
+        except WorkflowAlreadyStartedError:
+            duplicates.append(candidate_id)
+        else:
+            started.append({"candidate_id": candidate_id, "workflow_id": handle.id, "run_id": handle.result_run_id})
+        enriched.append({"candidate_id": candidate_id, "email": email, "score": hunter_result.get("score")})
+
+    _record_audit_event(
+        tenant_id=tenant_id,
+        event_type="enrichment.hunter_run_requested",
+        principal=principal,
+        payload={
+            "candidate_ids": [candidate.get("id") for candidate in candidates],
+            "enriched": len(enriched),
+            "started": len(started),
+            "pending": len(pending),
+            "duplicates": len(duplicates),
+        },
+    )
+    return _success(
+        {
+            "tenant_id": tenant_id,
+            "provider": "hunter",
+            "configured": True,
+            "enriched": enriched,
+            "started": started,
+            "pending": pending,
+            "duplicates": duplicates,
+            "message": f"Hunter enriqueceu {len(enriched)} candidato(s), iniciou {len(started)} fluxo(s) e manteve {len(pending)} pendente(s).",
         }
     )
 

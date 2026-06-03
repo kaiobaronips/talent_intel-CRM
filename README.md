@@ -89,6 +89,7 @@ As activities usam `Supabase Postgres` como persistencia principal e webhooks op
 - `OPENAI_MODEL` default: `gpt-4.1-mini`
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL` default: `deepseek/deepseek-v4-flash`
+- `HUNTER_API_KEY`
 - `NOTION_MIRROR_API_TOKEN`
 - `NOTION_MIRROR_TENANTS_DATA_SOURCE_ID`
 - `NOTION_MIRROR_CANDIDATES_DATA_SOURCE_ID`
@@ -109,6 +110,8 @@ Os webhooks podem ser conectados a provedores reais de sourcing, enriquecimento,
 Quando `OPENAI_API_KEY` ou `OPENROUTER_API_KEY` estiverem configuradas, as activities de classificacao e renderizacao de mensagem usam LLM diretamente antes de recorrer aos webhooks/dry-run. A ordem padrao e OpenAI primeiro e OpenRouter depois, mas `LLM_PROVIDER=openrouter` prioriza o OpenRouter com `deepseek/deepseek-v4-flash`. A IA gera score, classificacao, justificativa, resumo e copy inicial; o envio continua bloqueado por aprovacao humana na UI.
 
 A rota `POST /v1/tenants/{tenant_id}/sourcing/apollo/search` consulta Apollo.io quando `APOLLO_API_KEY` esta configurada. Ela cria workflows de candidato para perfis com e-mail ou LinkedIn retornados pela Apollo; quando a chave nao existe, retorna uma mensagem clara de configuracao pendente sem criar candidatos.
+
+A rota `POST /v1/tenants/{tenant_id}/enrichment/hunter/run` consulta Hunter.io quando `HUNTER_API_KEY` esta configurada. Ela encontra e-mails profissionais para candidatos pendentes de contato e inicia o lifecycle dos agentes apenas quando existe canal valido. Candidatos sem nome completo, dominio da empresa ou LinkedIn ficam marcados como pendentes de dados.
 
 ## Cadencia
 
