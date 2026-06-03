@@ -340,6 +340,13 @@ def _hunter_get(path: str, params: Dict[str, str]) -> Dict[str, Any]:
         raw = exc.read().decode("utf-8") if exc.fp else ""
         if exc.code == 404:
             return {"configured": True, "data": {}, "not_found": True}
+        if exc.code in {401, 403}:
+            return {
+                "configured": True,
+                "data": {},
+                "provider_error": True,
+                "message": "Hunter recusou a consulta neste momento. Verifique permissão da chave, plano ou bloqueio temporário do provedor.",
+            }
         if exc.code == 451:
             return {"configured": True, "data": {}, "blocked": True, "message": "Hunter bloqueou o processamento deste contato por solicitação do titular."}
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Hunter.io retornou HTTP {exc.code}: {raw[:300]}") from exc
@@ -369,7 +376,8 @@ def _candidate_person_name(name: str) -> str:
 def _candidate_company_domain(candidate: Dict[str, Any], metadata: Dict[str, Any]) -> str:
     domain = str(metadata.get("company_domain") or metadata.get("domain") or metadata.get("organization_domain") or "").strip()
     if domain:
-        return domain.removeprefix("https://").removeprefix("http://").split("/", 1)[0]
+        normalized = domain.removeprefix("https://").removeprefix("http://").split("/", 1)[0]
+        return normalized[4:] if normalized.startswith("www.") else normalized
     return ""
 
 
@@ -389,30 +397,26 @@ def _hunter_email_finder(candidate: Dict[str, Any]) -> Dict[str, Any]:
     domain = _candidate_company_domain(candidate, metadata)
 
     params: Dict[str, str] = {"max_duration": "10"}
-    if linkedin_handle:
-        params["linkedin_handle"] = linkedin_handle
-    else:
-        if not full_name:
-            return {
-                "configured": True,
-                "status": "insufficient_data",
-                "message": "Hunter precisa de nome completo do candidato ou handle do LinkedIn.",
-            }
-        if not domain and not company:
-            return {
-                "configured": True,
-                "status": "insufficient_data",
-                "message": "Hunter precisa de domínio ou nome da empresa para buscar e-mail.",
-            }
+    if full_name and (domain or company):
         params["full_name"] = full_name
         if domain:
             params["domain"] = domain
         else:
             params["company"] = company
+    elif linkedin_handle:
+        params["linkedin_handle"] = linkedin_handle
+    else:
+        return {
+            "configured": True,
+            "status": "insufficient_data",
+            "message": "Hunter precisa de nome completo com domínio/empresa, ou handle do LinkedIn.",
+        }
 
     result = _hunter_get("email-finder", params)
     if not result.get("configured"):
         return result
+    if result.get("provider_error"):
+        return {"configured": True, "status": "provider_error", "message": result.get("message", "")}
     if result.get("blocked"):
         return {"configured": True, "status": "blocked", "message": result.get("message", "")}
     data = result.get("data") or {}

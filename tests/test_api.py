@@ -904,3 +904,72 @@ def test_hunter_enrichment_updates_candidate_and_starts_lifecycle(monkeypatch) -
     assert upserts[0]["email"] == "candidate.one@example.com"
     assert upserts[0]["metadata"]["hunter_status"] == "found"
     assert upserts[0]["metadata"]["needs_contact_enrichment"] is False
+
+
+def test_hunter_email_finder_prefers_name_and_domain_over_linkedin(monkeypatch) -> None:
+    captured: list[dict[str, str]] = []
+
+    def hunter_get(_path: str, params: dict[str, str]) -> dict[str, object]:
+        captured.append(params)
+        return {
+            "configured": True,
+            "data": {
+                "email": "candidate@example.com",
+                "score": 81,
+                "domain": "example.com",
+                "verification": {"status": "valid"},
+            },
+        }
+
+    monkeypatch.setattr(api, "_hunter_get", hunter_get)
+
+    result = api._hunter_email_finder(
+        {
+            "id": "candidate-001",
+            "name": "Candidate One",
+            "linkedin_url": "https://www.linkedin.com/in/candidate-one",
+            "metadata_json": {"current_company": "Example", "company_domain": "www.example.com"},
+        }
+    )
+
+    assert result["status"] == "found"
+    assert captured[0]["full_name"] == "Candidate One"
+    assert captured[0]["domain"] == "example.com"
+    assert "linkedin_handle" not in captured[0]
+
+
+def test_hunter_enrichment_keeps_provider_error_pending(monkeypatch) -> None:
+    updates: list[tuple[str, str, dict[str, object]]] = []
+    candidate = {
+        "id": "candidate-001",
+        "tenant_id": "tenant-001",
+        "name": "Candidate One",
+        "email": "",
+        "linkedin_url": "https://linkedin.com/in/candidate-one",
+        "stage": "ingested",
+        "metadata_json": {"current_company": "Candidate Corp", "company_domain": "candidate.example", "needs_contact_enrichment": True},
+    }
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "env", lambda key, default="": "hunter-key" if key == "HUNTER_API_KEY" else default)
+    monkeypatch.setattr(api, "list_tenant_candidates", lambda _tenant_id, _page, _limit: {"items": [candidate], "total": 1})
+    monkeypatch.setattr(
+        api,
+        "_hunter_email_finder",
+        lambda _candidate: {
+            "configured": True,
+            "status": "provider_error",
+            "message": "Hunter recusou a consulta neste momento.",
+        },
+    )
+    monkeypatch.setattr(api, "update_candidate_state", lambda candidate_id, stage, metadata_updates: updates.append((candidate_id, stage, metadata_updates)) or candidate)
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/enrichment/hunter/run",
+        json={"max_candidates": 1},
+    )
+
+    assert response.status_code == 202
+    data = response.json()["data"]
+    assert data["enriched"] == []
+    assert data["pending"][0]["status"] == "provider_error"
+    assert updates[0][2]["hunter_status"] == "provider_error"
