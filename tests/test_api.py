@@ -660,7 +660,6 @@ def test_apollo_search_stages_profiles_without_contact_channel(monkeypatch) -> N
             "people": [
                 {
                     "id": "person-002",
-                    "name": "Preview Candidate",
                     "title": "Sales Executive",
                     "city": "São Paulo",
                     "organization": {"name": "Preview Corp"},
@@ -683,5 +682,6 @@ def test_apollo_search_stages_profiles_without_contact_channel(monkeypatch) -> N
     data = response.json()["data"]
     assert data["created"] == []
     assert len(data["staged"]) == 1
+    assert data["staged"][0]["name"] == "Apollo - Preview Corp"
     assert staged_payloads[0]["metadata"]["needs_contact_enrichment"] is True
     assert staged_payloads[0]["metadata"]["recommended_next_step"] == "Conectar Hunter.io para encontrar e validar e-mail profissional."

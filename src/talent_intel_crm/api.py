@@ -259,10 +259,13 @@ def _apollo_candidate_id(tenant_id: str, person: Dict[str, Any]) -> str:
 def _candidate_from_apollo_person(tenant_id: str, person: Dict[str, Any], source_payload: ApolloSearchRequest) -> Dict[str, Any]:
     organization = person.get("organization") if isinstance(person.get("organization"), dict) else {}
     account = person.get("account") if isinstance(person.get("account"), dict) else {}
-    name = str(person.get("name") or "Candidato Apollo").strip()
+    title = str(person.get("title") or "").strip()
+    current_company = str(organization.get("name") or account.get("name") or person.get("organization_name") or "").strip()
+    name = str(person.get("name") or "").strip()
+    if not name:
+        name = f"Apollo - {current_company}" if current_company else f"Apollo - {title[:80]}" if title else "Candidato Apollo"
     email = str(person.get("email") or "").strip()
     linkedin_url = str(person.get("linkedin_url") or person.get("linkedin_url_normalized") or person.get("linkedin") or "").strip()
-    current_company = str(organization.get("name") or account.get("name") or person.get("organization_name") or "").strip()
     return {
         "candidate_id": _apollo_candidate_id(tenant_id, person),
         "tenant_id": tenant_id,
@@ -275,7 +278,7 @@ def _candidate_from_apollo_person(tenant_id: str, person: Dict[str, Any], source
         "stage": CandidateStage.INGESTED.value,
         "metadata": {
             "state": str(person.get("state") or person.get("country") or "").strip(),
-            "current_role": str(person.get("title") or "").strip(),
+            "current_role": title,
             "current_company": current_company,
             "seniority": source_payload.seniority,
             "target_profile": source_payload.target_roles or source_payload.keywords,
