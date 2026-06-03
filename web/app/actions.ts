@@ -157,6 +157,7 @@ export async function searchApolloCandidatesAction(_previousState: ActionState, 
   const result = await apiMutation<{
     configured: boolean;
     created: { candidate_id: string }[];
+    staged: { candidate_id: string }[];
     duplicates: string[];
     skipped: { name: string; reason: string }[];
     message: string;
@@ -184,11 +185,12 @@ export async function searchApolloCandidatesAction(_previousState: ActionState, 
   }
 
   const created = result.data?.created.length ?? 0;
+  const staged = result.data?.staged.length ?? 0;
   const duplicates = result.data?.duplicates.length ?? 0;
   const skipped = result.data?.skipped.length ?? 0;
   return {
     ok: true,
-    message: `Apollo retornou ${created} candidato(s) enviados aos agentes. Duplicados: ${duplicates}. Sem canal útil: ${skipped}.`,
+    message: `Apollo retornou ${created} candidato(s) enviados aos agentes e ${staged} salvo(s) para enriquecimento. Duplicados: ${duplicates}. Ignorados: ${skipped}.`,
   };
 }
 

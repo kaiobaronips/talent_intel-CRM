@@ -39,6 +39,7 @@ from talent_intel_crm.db import (
     update_candidate_state,
     update_interaction_status,
     update_tenant_metadata,
+    upsert_candidate,
     upsert_tenant_membership,
 )
 from talent_intel_crm.domain import CandidateChannel, CandidateStage, TenantTier
@@ -257,14 +258,16 @@ def _apollo_candidate_id(tenant_id: str, person: Dict[str, Any]) -> str:
 
 def _candidate_from_apollo_person(tenant_id: str, person: Dict[str, Any], source_payload: ApolloSearchRequest) -> Dict[str, Any]:
     organization = person.get("organization") if isinstance(person.get("organization"), dict) else {}
+    account = person.get("account") if isinstance(person.get("account"), dict) else {}
     name = str(person.get("name") or "Candidato Apollo").strip()
     email = str(person.get("email") or "").strip()
-    linkedin_url = str(person.get("linkedin_url") or person.get("linkedin_url_normalized") or "").strip()
+    linkedin_url = str(person.get("linkedin_url") or person.get("linkedin_url_normalized") or person.get("linkedin") or "").strip()
+    current_company = str(organization.get("name") or account.get("name") or person.get("organization_name") or "").strip()
     return {
         "candidate_id": _apollo_candidate_id(tenant_id, person),
         "tenant_id": tenant_id,
         "name": name,
-        "city": str(person.get("city") or "").strip(),
+        "city": str(person.get("city") or person.get("person_city") or "").strip(),
         "email": email if "email_not_unlocked" not in email else "",
         "linkedin_url": linkedin_url,
         "channels": [channel for channel, value in ((CandidateChannel.EMAIL.value, email), (CandidateChannel.LINKEDIN.value, linkedin_url)) if value],
@@ -273,11 +276,12 @@ def _candidate_from_apollo_person(tenant_id: str, person: Dict[str, Any], source
         "metadata": {
             "state": str(person.get("state") or person.get("country") or "").strip(),
             "current_role": str(person.get("title") or "").strip(),
-            "current_company": str(organization.get("name") or person.get("organization_name") or "").strip(),
+            "current_company": current_company,
             "seniority": source_payload.seniority,
             "target_profile": source_payload.target_roles or source_payload.keywords,
             "source": "apollo",
             "apollo_person_id": str(person.get("id") or ""),
+            "needs_contact_enrichment": not bool(email or linkedin_url),
         },
     }
 
@@ -565,14 +569,37 @@ async def search_apollo_candidates(
     client = await connect_temporal()
     created: List[Dict[str, Any]] = []
     duplicates: List[str] = []
+    staged: List[Dict[str, Any]] = []
     skipped: List[Dict[str, str]] = []
 
     for person in apollo_result["people"][: payload.max_candidates]:
         candidate_payload = _candidate_from_apollo_person(tenant_id, person, payload)
-        if not candidate_payload["channels"]:
-            skipped.append({"name": candidate_payload["name"], "reason": "Sem e-mail ou LinkedIn retornado pela Apollo."})
-            continue
         candidate_id = str(candidate_payload["candidate_id"])
+        if not candidate_payload["channels"]:
+            existing = get_candidate(candidate_id)
+            if existing:
+                duplicates.append(candidate_id)
+                continue
+            upsert_candidate(
+                {
+                    **candidate_payload,
+                    "external_id": candidate_id,
+                    "metadata": {
+                        **candidate_payload["metadata"],
+                        "apollo_status": "discovered_without_contact_channel",
+                        "recommended_next_step": "Conectar Hunter.io para encontrar e validar e-mail profissional.",
+                    },
+                }
+            )
+            staged.append(
+                {
+                    "candidate_id": candidate_id,
+                    "name": candidate_payload["name"],
+                    "stage": CandidateStage.INGESTED.value,
+                    "reason": "Apollo retornou o perfil sem e-mail ou LinkedIn completo.",
+                }
+            )
+            continue
         try:
             handle = await client.start_workflow(
                 CandidateLifecycleWorkflow.run,
@@ -600,6 +627,7 @@ async def search_apollo_candidates(
         payload={
             "criteria": payload.model_dump(),
             "created": len(created),
+            "staged": len(staged),
             "duplicates": len(duplicates),
             "skipped": len(skipped),
         },
@@ -610,9 +638,10 @@ async def search_apollo_candidates(
             "provider": "apollo",
             "configured": True,
             "created": created,
+            "staged": staged,
             "duplicates": duplicates,
             "skipped": skipped,
-            "message": f"{len(created)} candidato(s) enviados para análise dos agentes.",
+            "message": f"{len(created)} candidato(s) enviados para análise dos agentes e {len(staged)} salvo(s) para enriquecimento de contato.",
         }
     )
 

@@ -610,6 +610,7 @@ def test_apollo_search_reports_missing_configuration(monkeypatch) -> None:
 
 def test_apollo_search_starts_candidate_lifecycles(monkeypatch) -> None:
     monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "get_candidate", lambda _candidate_id: {})
     monkeypatch.setattr(
         api,
         "_apollo_people_search",
@@ -644,3 +645,43 @@ def test_apollo_search_starts_candidate_lifecycles(monkeypatch) -> None:
     assert len(data["created"]) == 1
     assert data["created"][0]["channels"] == ["linkedin"]
     assert data["created"][0]["workflow_id"].startswith("candidate-lifecycle::tenant-001::apollo-")
+
+
+def test_apollo_search_stages_profiles_without_contact_channel(monkeypatch) -> None:
+    staged_payloads: list[dict[str, object]] = []
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "get_candidate", lambda _candidate_id: {})
+    monkeypatch.setattr(api, "upsert_candidate", lambda payload: staged_payloads.append(payload) or {"id": payload["candidate_id"]})
+    monkeypatch.setattr(
+        api,
+        "_apollo_people_search",
+        lambda _payload: {
+            "configured": True,
+            "people": [
+                {
+                    "id": "person-002",
+                    "name": "Preview Candidate",
+                    "title": "Sales Executive",
+                    "city": "São Paulo",
+                    "organization": {"name": "Preview Corp"},
+                }
+            ],
+        },
+    )
+
+    async def connect():
+        return FakeTemporalClient()
+
+    monkeypatch.setattr(api, "connect_temporal", connect)
+
+    response = TestClient(api.app).post(
+        "/v1/tenants/tenant-001/sourcing/apollo/search",
+        json={"target_roles": "Sales Executive", "locations": "São Paulo", "max_candidates": 3},
+    )
+
+    assert response.status_code == 202
+    data = response.json()["data"]
+    assert data["created"] == []
+    assert len(data["staged"]) == 1
+    assert staged_payloads[0]["metadata"]["needs_contact_enrichment"] is True
+    assert staged_payloads[0]["metadata"]["recommended_next_step"] == "Conectar Hunter.io para encontrar e validar e-mail profissional."
