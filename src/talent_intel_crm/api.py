@@ -592,6 +592,8 @@ def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
     projected["message_sent"] = message_sent
     projected["response_received"] = payload.get("response_received") or interaction.get("response_received")
     projected["next_action"] = next_action
+    projected["provider_message_id"] = interaction.get("provider_message_id") or payload.get("provider_message_id")
+    projected["provider_thread_id"] = interaction.get("provider_thread_id") or payload.get("provider_thread_id")
     return projected
 
 

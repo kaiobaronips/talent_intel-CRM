@@ -439,6 +439,8 @@ def get_interaction(interaction_id: str) -> dict[str, Any]:
 
 def update_interaction_status(interaction_id: str, status: str, payload_updates: dict[str, Any] | None = None) -> dict[str, Any]:
     payload_updates = payload_updates or {}
+    provider_message_id = payload_updates.get("provider_message_id")
+    provider_thread_id = payload_updates.get("provider_thread_id")
     with get_connection() as connection:
         with connection.cursor() as cur:
             cur.execute("select payload_json from interactions where id::text = %s", (interaction_id,))
@@ -454,12 +456,14 @@ def update_interaction_status(interaction_id: str, status: str, payload_updates:
                 """
                 update interactions
                 set status = %s,
+                    provider_message_id = coalesce(%s, provider_message_id),
+                    provider_thread_id = coalesce(%s, provider_thread_id),
                     payload_json = %s::jsonb
                 where id::text = %s
                 returning id, tenant_id, candidate_id, channel, message_type, status, provider_message_id,
                     provider_thread_id, idempotency_key, payload_json, created_at
                 """,
-                (status, json.dumps(payload, ensure_ascii=False), interaction_id),
+                (status, provider_message_id, provider_thread_id, json.dumps(payload, ensure_ascii=False), interaction_id),
             )
             return dict(cur.fetchone() or {})
 

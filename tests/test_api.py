@@ -607,6 +607,7 @@ def test_sent_email_interaction_uses_resend_after_approval(monkeypatch) -> None:
             **interaction,
             "id": interaction_id,
             "status": status,
+            "provider_message_id": None,
             "payload_json": {**interaction["payload_json"], **payload_updates},
         }
 
