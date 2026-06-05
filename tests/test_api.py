@@ -971,5 +971,6 @@ def test_hunter_enrichment_keeps_provider_error_pending(monkeypatch) -> None:
     assert response.status_code == 202
     data = response.json()["data"]
     assert data["enriched"] == []
+    assert data["provider_error"] == 1
     assert data["pending"][0]["status"] == "provider_error"
     assert updates[0][2]["hunter_status"] == "provider_error"

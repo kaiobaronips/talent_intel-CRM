@@ -1072,6 +1072,9 @@ async def run_hunter_enrichment(
     duplicates: List[str] = []
     already_ready = 0
     insufficient_data = 0
+    provider_error = 0
+    not_found = 0
+    blocked = 0
 
     for raw_candidate in candidates[: payload.max_candidates]:
         candidate = _candidate_projection(raw_candidate)
@@ -1102,13 +1105,20 @@ async def run_hunter_enrichment(
             )
 
         if hunter_result.get("status") != "found" or not hunter_result.get("email"):
-            if hunter_result.get("status") == "insufficient_data":
+            hunter_status = str(hunter_result.get("status") or "not_found")
+            if hunter_status == "insufficient_data":
                 insufficient_data += 1
+            elif hunter_status == "provider_error":
+                provider_error += 1
+            elif hunter_status == "blocked":
+                blocked += 1
+            elif hunter_status == "not_found":
+                not_found += 1
             update_candidate_state(
                 candidate_id,
                 str(candidate.get("stage") or CandidateStage.INGESTED.value),
                 {
-                    "hunter_status": hunter_result.get("status", "not_found"),
+                    "hunter_status": hunter_status,
                     "hunter_reason": hunter_result.get("message", ""),
                     "needs_contact_enrichment": True,
                 },
@@ -1116,7 +1126,7 @@ async def run_hunter_enrichment(
             pending.append(
                 {
                     "candidate_id": candidate_id,
-                    "status": str(hunter_result.get("status") or "not_found"),
+                    "status": hunter_status,
                     "reason": str(hunter_result.get("message") or "Hunter não encontrou e-mail profissional."),
                 }
             )
@@ -1202,7 +1212,10 @@ async def run_hunter_enrichment(
             "duplicates": duplicates,
             "already_ready": already_ready,
             "insufficient_data": insufficient_data,
-            "message": f"Hunter enriqueceu {len(enriched)} candidato(s), iniciou {len(started)} fluxo(s), encontrou {already_ready} já pronto(s) e manteve {insufficient_data} sem dados suficientes.",
+            "provider_error": provider_error,
+            "not_found": not_found,
+            "blocked": blocked,
+            "message": f"Hunter enriqueceu {len(enriched)} candidato(s), iniciou {len(started)} fluxo(s), encontrou {already_ready} já pronto(s), teve {provider_error} erro(s) do provedor, não encontrou e-mail para {not_found} e manteve {insufficient_data} sem dados suficientes.",
         }
     )
 

@@ -255,6 +255,9 @@ export async function runHunterEnrichmentAction(_previousState: ActionState, for
     duplicates: string[];
     already_ready: number;
     insufficient_data: number;
+    provider_error: number;
+    not_found: number;
+    blocked: number;
     message: string;
   }>(
     `/v1/tenants/${tenantId}/enrichment/hunter/run`,
@@ -279,10 +282,13 @@ export async function runHunterEnrichmentAction(_previousState: ActionState, for
   const started = result.data?.started.length ?? 0;
   const alreadyReady = result.data?.already_ready ?? 0;
   const insufficientData = result.data?.insufficient_data ?? 0;
+  const providerError = result.data?.provider_error ?? 0;
+  const notFound = result.data?.not_found ?? 0;
+  const blocked = result.data?.blocked ?? 0;
   const duplicates = result.data?.duplicates.length ?? 0;
   return {
     ok: true,
-    message: `Hunter enriqueceu ${enriched} candidato(s), iniciou ${started} fluxo(s), encontrou ${alreadyReady} já pronto(s), manteve ${insufficientData} sem dados suficientes e encontrou ${duplicates} fluxo(s) já iniciado(s).`,
+    message: `Hunter enriqueceu ${enriched} candidato(s), iniciou ${started} fluxo(s), encontrou ${alreadyReady} já pronto(s), teve ${providerError} erro(s) do provedor, não encontrou e-mail para ${notFound}, bloqueou ${blocked}, manteve ${insufficientData} sem dados suficientes e encontrou ${duplicates} fluxo(s) já iniciado(s).`,
   };
 }
 
