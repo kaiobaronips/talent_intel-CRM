@@ -505,7 +505,57 @@ def test_review_interaction_message_route(monkeypatch) -> None:
     interaction = response.json()["data"]["interaction"]
     assert interaction["status"] == "approved"
     assert interaction["message_sent"] == "Mensagem revisada."
+    assert interaction["message"]["body"] == "Mensagem revisada."
     assert events[0]["event_type"] == "interaction.message_reviewed"
+
+
+def test_resend_message_fields_prefer_reviewed_message_sent() -> None:
+    fields = api._resend_message_fields(
+        {
+            "payload_json": {
+                "email": "candidate@example.com",
+                "message_sent": "Mensagem revisada.",
+                "message": {"subject": "Convite rápido", "body": "Mensagem antiga."},
+            }
+        }
+    )
+
+    assert fields == {"to": "candidate@example.com", "subject": "Convite rápido", "text": "Mensagem revisada."}
+
+
+def test_send_resend_email_sets_user_agent(monkeypatch) -> None:
+    captured_headers: dict[str, str] = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b'{"id":"email-001"}'
+
+    def urlopen(request, timeout):
+        captured_headers.update(dict(request.header_items()))
+        assert timeout == 30
+        return Response()
+
+    monkeypatch.setattr(api, "env", lambda key, default="": "resend-key" if key == "RESEND_API_KEY" else default)
+    monkeypatch.setattr(api.urllib.request, "urlopen", urlopen)
+
+    result = api._send_resend_email(
+        {
+            "payload_json": {
+                "email": "candidate@example.com",
+                "message_sent": "Mensagem revisada.",
+                "message": {"subject": "Convite rápido"},
+            }
+        }
+    )
+
+    assert result["provider_message_id"] == "email-001"
+    assert captured_headers["User-agent"] == "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)"
 
 
 def test_sent_interaction_requires_approval(monkeypatch) -> None:

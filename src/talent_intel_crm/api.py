@@ -516,7 +516,7 @@ def _resend_message_fields(interaction: Dict[str, Any]) -> Dict[str, str]:
     message = payload.get("message") if isinstance(payload.get("message"), dict) else {}
     email = str(payload.get("email") or payload.get("candidate_email") or "").strip()
     subject = str(message.get("subject") or payload.get("subject") or "Contato sobre oportunidade profissional").strip()
-    body = _message_preview(message) or _message_preview(payload.get("message_sent"))
+    body = _message_preview(payload.get("message_sent")) or _message_preview(message)
     if not body:
         body = str(payload.get("message_sent") or "").strip()
     return {"to": email, "subject": subject, "text": body}
@@ -550,6 +550,7 @@ def _send_resend_email(interaction: Dict[str, Any]) -> Dict[str, Any]:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "User-Agent": "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)",
         },
     )
     try:
@@ -1810,10 +1811,17 @@ async def review_interaction_message(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
     authorize_tenant(principal, interaction["tenant_id"])
 
+    interaction_payload = interaction.get("payload_json") or {}
+    if not isinstance(interaction_payload, dict):
+        interaction_payload = {}
+    message = interaction_payload.get("message") if isinstance(interaction_payload.get("message"), dict) else {}
+    reviewed_message = {**message, "body": payload.message_sent}
+
     updated = update_interaction_status(
         interaction_id,
         payload.status,
         {
+            "message": reviewed_message,
             "message_sent": payload.message_sent,
             "manual_approval_status": payload.status,
             "manual_decision_note": payload.decision_note,
