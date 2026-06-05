@@ -559,6 +559,39 @@ def _record_audit_event(
     )
 
 
+def _metadata_from_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    metadata = record.get("metadata_json") or {}
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except json.JSONDecodeError:
+            metadata = {}
+    return metadata if isinstance(metadata, dict) else {}
+
+
+def _connector_item(
+    *,
+    key: str,
+    name: str,
+    configured: bool,
+    status_value: str,
+    summary: str,
+    last_result: str,
+    next_action: str,
+    metrics: Dict[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "key": key,
+        "name": name,
+        "configured": configured,
+        "status": status_value,
+        "summary": summary,
+        "last_result": last_result,
+        "next_action": next_action,
+        "metrics": metrics,
+    }
+
+
 @app.get("/health")
 async def health() -> Dict[str, Any]:
     temporal = TemporalConfig()
@@ -577,6 +610,134 @@ async def readiness(response: Response) -> Dict[str, Any]:
     if not postgres_ready:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return _success({"service": "talent-intel-crm-api", "postgres": postgres_ready})
+
+
+@app.get("/v1/tenants/{tenant_id}/connector-status")
+async def read_connector_status(tenant_id: str, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
+    require_tenant_admin(principal, tenant_id)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+
+    candidates = list_tenant_candidates(tenant_id, 1, 100).get("items", [])
+    apollo_candidates = []
+    hunter_counts = {"found": 0, "provider_error": 0, "not_found": 0, "insufficient_data": 0, "blocked": 0}
+    ready_for_hunter = 0
+    apollo_enriched = 0
+    apollo_staged = 0
+    with_contact_channel = 0
+
+    for candidate in candidates:
+        metadata = _metadata_from_record(candidate)
+        if candidate.get("email") or candidate.get("linkedin_url"):
+            with_contact_channel += 1
+        if metadata.get("source") == "apollo":
+            apollo_candidates.append(candidate)
+            if metadata.get("apollo_enrichment_status") == "found" or metadata.get("apollo_status") == "enriched":
+                apollo_enriched += 1
+            if metadata.get("apollo_status") == "discovered_without_contact_channel":
+                apollo_staged += 1
+            if metadata.get("ready_for_hunter"):
+                ready_for_hunter += 1
+        hunter_status = str(metadata.get("hunter_status") or "")
+        if hunter_status in hunter_counts:
+            hunter_counts[hunter_status] += 1
+
+    apollo_configured = bool(env("APOLLO_API_KEY"))
+    hunter_configured = bool(env("HUNTER_API_KEY"))
+    openai_configured = bool(env("OPENAI_API_KEY"))
+    openrouter_configured = bool(env("OPENROUTER_API_KEY"))
+    llm_provider = (env("LLM_PROVIDER", "openai") or "openai").lower()
+    temporal = TemporalConfig()
+
+    apollo_status = "offline"
+    apollo_last_result = "Chave não configurada."
+    apollo_next_action = "Configurar APOLLO_API_KEY no serviço da API."
+    if apollo_configured:
+        apollo_status = "active" if apollo_enriched or apollo_candidates else "pending"
+        apollo_last_result = f"{len(apollo_candidates)} candidato(s) importado(s), {apollo_enriched} perfil(is) completo(s)."
+        apollo_next_action = "Buscar candidatos no Apollo e depois completar dados do Apollo."
+
+    hunter_status_value = "offline"
+    hunter_last_result = "Chave não configurada."
+    hunter_next_action = "Configurar HUNTER_API_KEY no serviço da API."
+    if hunter_configured:
+        if hunter_counts["provider_error"]:
+            hunter_status_value = "degraded"
+            hunter_last_result = f"{hunter_counts['provider_error']} erro(s) do provedor; {hunter_counts['found']} e-mail(s) encontrado(s)."
+            hunter_next_action = "Verificar plano, crédito ou permissão da chave Hunter. Tentar novamente após ajuste no provedor."
+        elif hunter_counts["found"]:
+            hunter_status_value = "active"
+            hunter_last_result = f"{hunter_counts['found']} e-mail(s) encontrado(s) pela Hunter."
+            hunter_next_action = "Revisar candidatos enriquecidos e contatos gerados pelos agentes."
+        elif ready_for_hunter:
+            hunter_status_value = "pending"
+            hunter_last_result = f"{ready_for_hunter} candidato(s) pronto(s) para consulta Hunter."
+            hunter_next_action = "Rodar Hunter para buscar e validar e-mails profissionais."
+        else:
+            hunter_status_value = "active"
+            hunter_last_result = "Configurado, sem pendências novas para consultar."
+            hunter_next_action = "Completar dados do Apollo antes de rodar Hunter."
+
+    llm_configured = openai_configured or openrouter_configured
+    llm_status = "active" if llm_configured else "offline"
+    selected_llm_ready = (llm_provider == "openrouter" and openrouter_configured) or (llm_provider == "openai" and openai_configured)
+    if llm_configured and not selected_llm_ready:
+        llm_status = "degraded"
+
+    items = [
+        _connector_item(
+            key="api",
+            name="API Talent Intel CRM",
+            configured=True,
+            status_value="active",
+            summary="Serviço central que autentica, consulta o banco e inicia fluxos.",
+            last_result="API respondeu a esta consulta com sucesso.",
+            next_action="Manter monitoramento de health e readiness.",
+            metrics={"with_contact_channel": with_contact_channel, "total_candidates": len(candidates)},
+        ),
+        _connector_item(
+            key="apollo",
+            name="Apollo.io",
+            configured=apollo_configured,
+            status_value=apollo_status,
+            summary="Busca candidatos e completa nome, LinkedIn, empresa e domínio.",
+            last_result=apollo_last_result,
+            next_action=apollo_next_action,
+            metrics={"imported": len(apollo_candidates), "enriched": apollo_enriched, "staged": apollo_staged, "ready_for_hunter": ready_for_hunter},
+        ),
+        _connector_item(
+            key="hunter",
+            name="Hunter.io",
+            configured=hunter_configured,
+            status_value=hunter_status_value,
+            summary="Busca e valida e-mails profissionais antes da abordagem.",
+            last_result=hunter_last_result,
+            next_action=hunter_next_action,
+            metrics=hunter_counts,
+        ),
+        _connector_item(
+            key="llm",
+            name="OpenAI / OpenRouter",
+            configured=llm_configured,
+            status_value=llm_status,
+            summary="Classifica candidatos, justifica o score e gera mensagens.",
+            last_result=f"Provider preferido: {llm_provider}. OpenAI: {'configurado' if openai_configured else 'pendente'}. OpenRouter: {'configurado' if openrouter_configured else 'pendente'}.",
+            next_action="Manter pelo menos um provedor LLM configurado para classificação e copy.",
+            metrics={"openai_configured": openai_configured, "openrouter_configured": openrouter_configured, "provider": llm_provider},
+        ),
+        _connector_item(
+            key="temporal",
+            name="Temporal",
+            configured=bool(temporal.target_host and temporal.target_host != "unknown"),
+            status_value="active" if temporal.target_host and temporal.target_host != "unknown" else "offline",
+            summary="Orquestra retries, etapas dos agentes e auditoria operacional.",
+            last_result=f"Namespace: {temporal.namespace}. Task queue: {temporal.task_queue}.",
+            next_action="Acompanhar execuções em Fluxos e logs do worker.",
+            metrics={"namespace": temporal.namespace, "task_queue": temporal.task_queue},
+        ),
+    ]
+
+    return _success({"tenant_id": tenant_id, "items": items})
 
 
 

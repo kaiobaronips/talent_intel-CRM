@@ -66,6 +66,56 @@ def test_readiness_reports_database_state(monkeypatch) -> None:
     assert response.json()["data"]["postgres"] is False
 
 
+def test_connector_status_summarizes_provider_state(monkeypatch) -> None:
+    candidates = [
+        {
+            "id": "apollo-001",
+            "email": "",
+            "linkedin_url": "https://linkedin.com/in/candidate-one",
+            "metadata_json": {
+                "source": "apollo",
+                "apollo_status": "enriched",
+                "apollo_enrichment_status": "found",
+                "ready_for_hunter": True,
+                "hunter_status": "provider_error",
+            },
+        },
+        {
+            "id": "apollo-002",
+            "email": "candidate@example.com",
+            "linkedin_url": "",
+            "metadata_json": {
+                "source": "apollo",
+                "apollo_status": "enriched",
+                "apollo_enrichment_status": "found",
+                "hunter_status": "found",
+            },
+        },
+    ]
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "list_tenant_candidates", lambda _tenant_id, _page, _limit: {"items": candidates, "total": len(candidates)})
+    monkeypatch.setattr(
+        api,
+        "env",
+        lambda key, default="": {
+            "APOLLO_API_KEY": "apollo-key",
+            "HUNTER_API_KEY": "hunter-key",
+            "OPENROUTER_API_KEY": "openrouter-key",
+            "LLM_PROVIDER": "openrouter",
+        }.get(key, default),
+    )
+
+    response = TestClient(api.app).get("/v1/tenants/tenant-001/connector-status")
+
+    assert response.status_code == 200
+    items = {item["key"]: item for item in response.json()["data"]["items"]}
+    assert items["apollo"]["status"] == "active"
+    assert items["apollo"]["metrics"]["enriched"] == 2
+    assert items["hunter"]["status"] == "degraded"
+    assert items["hunter"]["metrics"]["provider_error"] == 1
+    assert items["llm"]["status"] == "active"
+
+
 def test_create_candidate_rejects_missing_channel() -> None:
     response = TestClient(api.app).post(
         "/v1/candidates",
