@@ -46,9 +46,10 @@ function StatusButton({
 }
 
 export function InteractionStatusForms({ interaction, tenantId }: InteractionStatusFormsProps) {
+  const sendLabel = interaction.channel === 'email' ? 'Enviar e-mail' : 'Marcar enviada';
   return (
     <div className="flex flex-wrap gap-2">
-      <StatusButton interaction={interaction} tenantId={tenantId} status="sent" label="Marcar enviada" />
+      <StatusButton interaction={interaction} tenantId={tenantId} status="sent" label={sendLabel} />
       <StatusButton interaction={interaction} tenantId={tenantId} status="replied" label="Registrar resposta" />
     </div>
   );

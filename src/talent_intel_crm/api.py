@@ -509,6 +509,61 @@ def _message_preview(message: Any) -> str:
     return ""
 
 
+def _resend_message_fields(interaction: Dict[str, Any]) -> Dict[str, str]:
+    payload = interaction.get("payload_json") or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    message = payload.get("message") if isinstance(payload.get("message"), dict) else {}
+    email = str(payload.get("email") or payload.get("candidate_email") or "").strip()
+    subject = str(message.get("subject") or payload.get("subject") or "Contato sobre oportunidade profissional").strip()
+    body = _message_preview(message) or _message_preview(payload.get("message_sent"))
+    if not body:
+        body = str(payload.get("message_sent") or "").strip()
+    return {"to": email, "subject": subject, "text": body}
+
+
+def _send_resend_email(interaction: Dict[str, Any]) -> Dict[str, Any]:
+    api_key = env("RESEND_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="RESEND_API_KEY ainda não está configurada no serviço da API.")
+    from_email = env("RESEND_FROM_EMAIL", "Talent Intel CRM <onboarding@resend.dev>")
+    reply_to = env("RESEND_REPLY_TO_EMAIL")
+    fields = _resend_message_fields(interaction)
+    if not fields["to"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta interação não tem e-mail do candidato.")
+    if not fields["text"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta interação não tem mensagem revisada para envio.")
+
+    request_payload: Dict[str, Any] = {
+        "from": from_email,
+        "to": [fields["to"]],
+        "subject": fields["subject"],
+        "text": fields["text"],
+    }
+    if reply_to:
+        request_payload["reply_to"] = reply_to
+    request = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(request_payload, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8") if exc.fp else ""
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Resend retornou HTTP {exc.code}: {raw[:300]}") from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Falha ao enviar e-mail pelo Resend.") from exc
+    resend_id = str(data.get("id") or "").strip() if isinstance(data, dict) else ""
+    return {"provider": "resend", "provider_message_id": resend_id, "to": fields["to"], "subject": fields["subject"]}
+
+
 def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
     payload = interaction.get("payload_json") or {}
     if isinstance(payload, str):
@@ -1721,12 +1776,26 @@ async def update_interaction_status_route(
     if payload.response_received:
         payload_updates["response_received"] = payload.response_received
     if payload.status == "sent":
+        if interaction.get("channel") == CandidateChannel.EMAIL.value:
+            resend_result = _send_resend_email(interaction)
+            payload_updates["email_provider"] = "resend"
+            payload_updates["provider_message_id"] = resend_result.get("provider_message_id", "")
+            payload_updates["email_sent_to"] = resend_result.get("to", "")
+            payload_updates["email_subject"] = resend_result.get("subject", "")
         payload_updates["manual_approval_status"] = "sent"
     if payload.status == "replied":
         payload_updates["manual_approval_status"] = "replied"
     updated = update_interaction_status(interaction_id, payload.status, payload_updates)
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
+    if payload.status == "sent":
+        _record_audit_event(
+            tenant_id=interaction["tenant_id"],
+            candidate_id=interaction["candidate_id"],
+            event_type="interaction.email_sent" if interaction.get("channel") == CandidateChannel.EMAIL.value else "interaction.marked_sent",
+            principal=principal,
+            payload={"interaction_id": interaction_id, "channel": interaction.get("channel"), "provider": payload_updates.get("email_provider", "manual")},
+        )
     return _success({"interaction": _interaction_projection(updated)})
 
 

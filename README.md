@@ -78,6 +78,9 @@ As activities usam `Supabase Postgres` como persistencia principal e webhooks op
 
 - `SUPABASE_DB_URL`
 - `EMAIL_SEND_WEBHOOK_URL`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL` default: `Talent Intel CRM <onboarding@resend.dev>`
+- `RESEND_REPLY_TO_EMAIL`
 - `LINKEDIN_SEND_WEBHOOK_URL`
 - `LINKEDIN_SEARCH_WEBHOOK_URL`
 - `APOLLO_API_KEY`

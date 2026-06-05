@@ -528,6 +528,71 @@ def test_sent_interaction_requires_approval(monkeypatch) -> None:
     assert response.json()["detail"] == "Message must be approved before send"
 
 
+def test_sent_email_interaction_uses_resend_after_approval(monkeypatch) -> None:
+    sent_payloads: list[dict[str, object]] = []
+    events: list[dict[str, object]] = []
+    interaction = {
+        "id": "interaction-001",
+        "tenant_id": "tenant-001",
+        "candidate_id": "candidate-001",
+        "channel": "email",
+        "status": "approved",
+        "payload_json": {
+            "email": "candidate@example.com",
+            "message_sent": "Mensagem aprovada.",
+            "manual_approval_status": "approved",
+            "message": {"subject": "Convite rápido", "body": "Mensagem aprovada."},
+        },
+    }
+    monkeypatch.setattr(api, "get_interaction", lambda _interaction_id: interaction)
+    monkeypatch.setattr(api, "append_audit_event", lambda payload: events.append(payload) or {"id": "audit-1", **payload})
+    monkeypatch.setattr(
+        api,
+        "_send_resend_email",
+        lambda payload: sent_payloads.append(payload) or {"provider": "resend", "provider_message_id": "email-001", "to": "candidate@example.com", "subject": "Convite rápido"},
+    )
+
+    def update(interaction_id, status, payload_updates):
+        return {
+            **interaction,
+            "id": interaction_id,
+            "status": status,
+            "payload_json": {**interaction["payload_json"], **payload_updates},
+        }
+
+    monkeypatch.setattr(api, "update_interaction_status", update)
+
+    response = TestClient(api.app).post("/v1/interactions/interaction-001/status", json={"status": "sent"})
+
+    assert response.status_code == 200
+    data = response.json()["data"]["interaction"]
+    assert data["status"] == "sent"
+    assert data["provider_message_id"] == "email-001"
+    assert sent_payloads[0]["id"] == "interaction-001"
+    assert events[0]["event_type"] == "interaction.email_sent"
+
+
+def test_sent_email_interaction_requires_resend_configuration(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api,
+        "get_interaction",
+        lambda _interaction_id: {
+            "id": "interaction-001",
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "channel": "email",
+            "status": "approved",
+            "payload_json": {"email": "candidate@example.com", "message_sent": "Mensagem aprovada.", "manual_approval_status": "approved"},
+        },
+    )
+    monkeypatch.setattr(api, "env", lambda key, default="": "" if key == "RESEND_API_KEY" else default)
+
+    response = TestClient(api.app).post("/v1/interactions/interaction-001/status", json={"status": "sent"})
+
+    assert response.status_code == 400
+    assert "RESEND_API_KEY" in response.json()["detail"]
+
+
 def test_candidate_decision_route(monkeypatch) -> None:
     events: list[dict[str, object]] = []
     monkeypatch.setattr(api, "append_audit_event", lambda payload: events.append(payload) or {"id": "audit-1", **payload})
