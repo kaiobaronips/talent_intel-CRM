@@ -14,6 +14,7 @@ type InteractionReviewFormProps = {
 export function InteractionReviewForm({ interaction, tenantId }: InteractionReviewFormProps) {
   const [state, action, pending] = useActionState(reviewInteractionMessageAction, initialState);
   const currentMessage = interaction.message_sent ?? '';
+  const currentSubject = interaction.email_subject ?? (interaction.payload_json?.message as { subject?: string } | undefined)?.subject ?? '';
   const approved = (interaction.status ?? interaction.interaction_status) === 'approved';
 
   return (
@@ -22,6 +23,16 @@ export function InteractionReviewForm({ interaction, tenantId }: InteractionRevi
       <input type="hidden" name="candidate_id" value={interaction.candidate_id} />
       <input type="hidden" name="interaction_id" value={interaction.id} />
       <p className="text-xs font-bold uppercase text-stone-500">Revisão humana</p>
+      {interaction.channel === 'email' ? (
+        <label className="mt-3 grid gap-2 text-sm font-bold text-stone-700">
+          Assunto do e-mail
+          <input
+            name="subject"
+            defaultValue={currentSubject}
+            className="rounded-lg border border-stone-200 bg-white px-4 py-3 font-medium text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+          />
+        </label>
+      ) : null}
       <label className="mt-3 grid gap-2 text-sm font-bold text-stone-700">
         Mensagem final
         <textarea

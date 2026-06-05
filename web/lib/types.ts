@@ -82,6 +82,12 @@ export type Interaction = {
   response_received?: string | null;
   manual_approval_status?: string | null;
   manual_decision_note?: string | null;
+  email_sent_to?: string | null;
+  email_subject?: string | null;
+  provider_message_id?: string | null;
+  provider_thread_id?: string | null;
+  cadence_step?: string | null;
+  scheduled_after_days?: number | null;
   payload_json?: Record<string, unknown> | null;
   scheduled_at?: string | null;
   sent_at?: string | null;

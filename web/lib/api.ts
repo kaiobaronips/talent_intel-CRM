@@ -183,13 +183,22 @@ export async function reviewInteractionMessage(
   status: 'draft' | 'pending' | 'approved',
   messageSent: string,
   decisionNote = '',
+  subject = '',
   options: ApiAuthOptions = {},
 ): Promise<ApiMutationResult<{ interaction: Interaction }>> {
   return apiMutation<{ interaction: Interaction }>(`/v1/interactions/${interactionId}/review`, 'POST', {
     status,
     message_sent: messageSent,
+    subject,
     decision_note: decisionNote,
   }, options);
+}
+
+export async function prepareCandidateEmailFollowUp(
+  candidateId: string,
+  options: ApiAuthOptions = {},
+): Promise<ApiMutationResult<{ interaction: Interaction; already_prepared: boolean }>> {
+  return apiMutation<{ interaction: Interaction; already_prepared: boolean }>(`/v1/candidates/${candidateId}/email-follow-up`, 'POST', {}, options);
 }
 
 export async function updateCandidateDecision(

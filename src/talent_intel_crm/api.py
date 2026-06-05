@@ -7,6 +7,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -20,6 +21,7 @@ from talent_intel_crm.config import TemporalConfig
 from talent_intel_crm.db import (
     database_ready,
     append_audit_event,
+    append_interaction_row,
     delete_tenant_membership,
     find_auth_user_by_email,
     get_candidate,
@@ -117,6 +119,7 @@ class InteractionStatusUpdateRequest(BaseModel):
 class InteractionReviewRequest(BaseModel):
     status: str = Field(default="approved", pattern="^(draft|pending|approved)$")
     message_sent: str = Field(min_length=1, max_length=4000)
+    subject: str = Field(default="", max_length=500)
     decision_note: str = Field(default="", max_length=1000)
 
 
@@ -172,6 +175,9 @@ class ApolloEnrichmentRequest(BaseModel):
 class HunterEnrichmentRequest(BaseModel):
     candidate_ids: List[str] = Field(default_factory=list, max_length=25)
     max_candidates: int = Field(default=10, ge=1, le=25)
+
+
+FOLLOW_UP_STEPS = ("follow_up_1", "follow_up_2", "follow_up_3")
 
 
 def _success(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -492,6 +498,92 @@ def _candidate_projection(candidate: Dict[str, Any]) -> Dict[str, Any]:
     return projected
 
 
+def _tenant_metadata(tenant_id: str) -> Dict[str, Any]:
+    tenant = get_tenant(tenant_id)
+    metadata = tenant.get("metadata_json") if tenant else {}
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except json.JSONDecodeError:
+            metadata = {}
+    return metadata if isinstance(metadata, dict) else {}
+
+
+def _render_outreach_template(template: str, candidate: Dict[str, Any]) -> str:
+    projected = _candidate_projection(candidate)
+    metadata = projected.get("metadata_json") or {}
+    values = {
+        "nome": projected.get("name") or "talento",
+        "cargo": projected.get("current_role") or metadata.get("current_role") or "sua área de atuação",
+        "empresa": projected.get("current_company") or metadata.get("current_company") or "sua empresa atual",
+        "cidade": projected.get("city") or "sua região",
+        "senioridade": projected.get("seniority") or metadata.get("seniority") or "seu nível de experiência",
+    }
+    rendered = template
+    for key, value in values.items():
+        rendered = rendered.replace(f"{{{{{key}}}}}", str(value))
+    return rendered.strip()
+
+
+def _follow_up_message(candidate: Dict[str, Any], tenant_id: str, step: str) -> Dict[str, str]:
+    metadata = _tenant_metadata(tenant_id)
+    templates = metadata.get("message_templates") if isinstance(metadata.get("message_templates"), dict) else {}
+    defaults = {
+        "follow_up_1": {
+            "subject": "Retomando meu contato",
+            "body": "Olá {{nome}}, passando para retomar meu contato anterior. Se fizer sentido para você, posso compartilhar mais contexto sobre a oportunidade.",
+        },
+        "follow_up_2": {
+            "subject": "Ainda faz sentido conversarmos?",
+            "body": "Olá {{nome}}, sei que a agenda pode estar corrida. Caso este tema faça sentido, posso te enviar um resumo objetivo da oportunidade.",
+        },
+        "follow_up_3": {
+            "subject": "Encerrando meu contato por enquanto",
+            "body": "Olá {{nome}}, este será meu último contato por enquanto. Se a conversa fizer sentido no futuro, fico à disposição para retomarmos. Obrigado.",
+        },
+    }
+    subject = templates.get(f"email_{step}_subject") or defaults[step]["subject"]
+    body = templates.get(f"email_{step}_body") or defaults[step]["body"]
+    return {
+        "subject": _render_outreach_template(str(subject), candidate),
+        "body": _render_outreach_template(str(body), candidate),
+        "language": "pt-BR",
+        "template_status": "tenant_template",
+    }
+
+
+def _sent_today_count(tenant_id: str) -> int:
+    today = datetime.now(timezone.utc).date().isoformat()
+    result = list_tenant_interactions(tenant_id, 1, 100)
+    count = 0
+    for interaction in result.get("items", []):
+        payload = interaction.get("payload_json") if isinstance(interaction.get("payload_json"), dict) else {}
+        sent_at = str(payload.get("sent_at") or interaction.get("created_at") or "")
+        if interaction.get("channel") == CandidateChannel.EMAIL.value and interaction.get("status") == "sent" and sent_at.startswith(today):
+            count += 1
+    return count
+
+
+def _next_email_follow_up_step(interactions: List[Dict[str, Any]]) -> tuple[str, Optional[Dict[str, Any]]]:
+    email_follow_ups = [
+        interaction
+        for interaction in interactions
+        if interaction.get("channel") == CandidateChannel.EMAIL.value and interaction.get("message_type") == "follow_up"
+    ]
+    for interaction in email_follow_ups:
+        if interaction.get("status") in {"draft", "pending", "approved"}:
+            return "", interaction
+    completed_steps = {
+        str((interaction.get("payload_json") or {}).get("cadence_step") or "")
+        for interaction in email_follow_ups
+        if interaction.get("status") in {"sent", "replied", "closed"}
+    }
+    for step in FOLLOW_UP_STEPS:
+        if step not in completed_steps:
+            return step, None
+    return "", None
+
+
 def _message_preview(message: Any) -> str:
     if isinstance(message, str):
         return message.strip()
@@ -578,7 +670,7 @@ def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
     message = payload.get("message") if isinstance(payload.get("message"), dict) else {}
     status_value = interaction.get("status") or payload.get("status") or "pending"
     candidate_name = payload.get("name") or interaction.get("candidate_name")
-    message_sent = _message_preview(message) or _message_preview(payload.get("message_sent"))
+    message_sent = _message_preview(payload.get("message_sent")) or _message_preview(message)
     next_action = payload.get("next_action")
     if not next_action:
         channel = interaction.get("channel")
@@ -594,6 +686,7 @@ def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
     projected["next_action"] = next_action
     projected["provider_message_id"] = interaction.get("provider_message_id") or payload.get("provider_message_id")
     projected["provider_thread_id"] = interaction.get("provider_thread_id") or payload.get("provider_thread_id")
+    projected["email_subject"] = payload.get("email_subject") or message.get("subject")
     return projected
 
 
@@ -1744,6 +1837,70 @@ async def read_candidate_interactions(candidate_id: str, principal: APIPrincipal
     )
 
 
+@app.post("/v1/candidates/{candidate_id}/email-follow-up", status_code=status.HTTP_201_CREATED)
+async def prepare_candidate_email_follow_up(candidate_id: str, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
+    candidate = get_candidate(candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+    tenant_id = candidate["tenant_id"]
+    authorize_tenant(principal, tenant_id)
+    if not str(candidate.get("email") or "").strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O candidato não tem e-mail para follow-up.")
+
+    metadata = _tenant_metadata(tenant_id)
+    limits = metadata.get("mvp_limits") if isinstance(metadata.get("mvp_limits"), dict) else {}
+    if limits.get("email_enabled") is False:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="E-mail está desabilitado nas preferências do MVP.")
+    daily_limit = int(limits.get("daily_contact_limit") or 20)
+    if daily_limit > 0 and _sent_today_count(tenant_id) >= daily_limit:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Limite diário de e-mails atingido para esta empresa.")
+
+    interactions = list_candidate_interactions(candidate_id)
+    email_interactions = [interaction for interaction in interactions if interaction.get("channel") == CandidateChannel.EMAIL.value]
+    has_sent_email = any(interaction.get("status") in {"sent", "replied", "closed"} for interaction in email_interactions)
+    if not has_sent_email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Envie o e-mail inicial antes de preparar follow-up.")
+    if any(interaction.get("status") == "replied" for interaction in email_interactions):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O candidato já respondeu. Use o acompanhamento manual da resposta.")
+
+    step, existing = _next_email_follow_up_step(interactions)
+    if existing:
+        return _success({"interaction": _interaction_projection(existing), "already_prepared": True})
+    max_follow_ups = max(0, min(int(limits.get("max_attempts_per_candidate") or len(FOLLOW_UP_STEPS)), len(FOLLOW_UP_STEPS)))
+    if not step or FOLLOW_UP_STEPS.index(step) >= max_follow_ups:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não há novos follow-ups disponíveis para este candidato.")
+
+    message = _follow_up_message(candidate, tenant_id, step)
+    payload = {
+        "tenant_id": tenant_id,
+        "candidate_id": candidate_id,
+        "name": candidate.get("name", ""),
+        "email": candidate.get("email", ""),
+        "city": candidate.get("city", ""),
+        "linkedin_url": candidate.get("linkedin_url", ""),
+        "channel": CandidateChannel.EMAIL.value,
+        "message_type": "follow_up",
+        "cadence_step": step,
+        "status": "pending",
+        "manual_approval_status": "pending",
+        "message": message,
+        "message_sent": message["body"],
+        "next_action": "Revisar e aprovar follow-up por e-mail",
+        "idempotency_key": f"{candidate_id}:email:{step}",
+        "scheduled_after_days": int(limits.get("follow_up_interval_days") or 5),
+    }
+    created = append_interaction_row(payload)
+    interaction = get_interaction(str(created.get("id"))) if created.get("id") else created
+    _record_audit_event(
+        tenant_id=tenant_id,
+        candidate_id=candidate_id,
+        event_type="interaction.email_follow_up_prepared",
+        principal=principal,
+        payload={"interaction_id": created.get("id"), "cadence_step": step, "scheduled_after_days": payload["scheduled_after_days"]},
+    )
+    return _success({"interaction": _interaction_projection(interaction), "already_prepared": False})
+
+
 @app.get("/v1/tenants/{tenant_id}/interactions")
 async def read_tenant_interactions(
     tenant_id: str,
@@ -1785,6 +1942,7 @@ async def update_interaction_status_route(
             payload_updates["provider_message_id"] = resend_result.get("provider_message_id", "")
             payload_updates["email_sent_to"] = resend_result.get("to", "")
             payload_updates["email_subject"] = resend_result.get("subject", "")
+            payload_updates["sent_at"] = datetime.now(timezone.utc).isoformat()
         payload_updates["manual_approval_status"] = "sent"
     if payload.status == "replied":
         payload_updates["manual_approval_status"] = "replied"
@@ -1818,6 +1976,8 @@ async def review_interaction_message(
         interaction_payload = {}
     message = interaction_payload.get("message") if isinstance(interaction_payload.get("message"), dict) else {}
     reviewed_message = {**message, "body": payload.message_sent}
+    if payload.subject:
+        reviewed_message["subject"] = payload.subject
 
     updated = update_interaction_status(
         interaction_id,
@@ -1825,6 +1985,7 @@ async def review_interaction_message(
         {
             "message": reviewed_message,
             "message_sent": payload.message_sent,
+            "email_subject": reviewed_message.get("subject", ""),
             "manual_approval_status": payload.status,
             "manual_decision_note": payload.decision_note,
         },

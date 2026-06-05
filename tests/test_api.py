@@ -498,7 +498,7 @@ def test_review_interaction_message_route(monkeypatch) -> None:
 
     response = TestClient(api.app).post(
         "/v1/interactions/interaction-001/review",
-        json={"status": "approved", "message_sent": "Mensagem revisada.", "decision_note": "Aprovado."},
+        json={"status": "approved", "message_sent": "Mensagem revisada.", "subject": "Assunto revisado", "decision_note": "Aprovado."},
     )
 
     assert response.status_code == 200
@@ -506,6 +506,7 @@ def test_review_interaction_message_route(monkeypatch) -> None:
     assert interaction["status"] == "approved"
     assert interaction["message_sent"] == "Mensagem revisada."
     assert interaction["message"]["body"] == "Mensagem revisada."
+    assert interaction["email_subject"] == "Assunto revisado"
     assert events[0]["event_type"] == "interaction.message_reviewed"
 
 
@@ -642,6 +643,81 @@ def test_sent_email_interaction_requires_resend_configuration(monkeypatch) -> No
 
     assert response.status_code == 400
     assert "RESEND_API_KEY" in response.json()["detail"]
+
+
+def test_prepare_candidate_email_follow_up_creates_pending_message(monkeypatch) -> None:
+    events: list[dict[str, object]] = []
+    candidate = {
+        "id": "candidate-001",
+        "tenant_id": "tenant-001",
+        "name": "Candidate One",
+        "email": "candidate@example.com",
+        "city": "Sao Paulo",
+        "metadata_json": {"current_role": "Executiva de vendas"},
+    }
+    created_payloads: list[dict[str, object]] = []
+    monkeypatch.setattr(api, "append_audit_event", lambda payload: events.append(payload) or {"id": "audit-1", **payload})
+    monkeypatch.setattr(api, "get_candidate", lambda _candidate_id: candidate)
+    monkeypatch.setattr(api, "get_tenant", lambda _tenant_id: {"id": "tenant-001", "metadata_json": {"mvp_limits": {"daily_contact_limit": 20, "max_attempts_per_candidate": 3, "email_enabled": True}, "message_templates": {"email_follow_up_1_subject": "Retomando, {{nome}}", "email_follow_up_1_body": "Olá {{nome}}, retomando sobre {{cargo}}."}}})
+    monkeypatch.setattr(
+        api,
+        "list_candidate_interactions",
+        lambda _candidate_id: [
+            {
+                "id": "initial-001",
+                "tenant_id": "tenant-001",
+                "candidate_id": "candidate-001",
+                "channel": "email",
+                "message_type": "initial",
+                "status": "sent",
+                "payload_json": {},
+            }
+        ],
+    )
+    monkeypatch.setattr(api, "list_tenant_interactions", lambda _tenant_id, _page, _limit: {"items": [], "total": 0})
+
+    def append(payload):
+        created_payloads.append(payload)
+        return {"id": "follow-001", **payload}
+
+    monkeypatch.setattr(api, "append_interaction_row", append)
+    monkeypatch.setattr(
+        api,
+        "get_interaction",
+        lambda _interaction_id: {
+            "id": "follow-001",
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "channel": "email",
+            "message_type": "follow_up",
+            "status": "pending",
+            "payload_json": created_payloads[0],
+        },
+    )
+
+    response = TestClient(api.app).post("/v1/candidates/candidate-001/email-follow-up")
+
+    assert response.status_code == 201
+    interaction = response.json()["data"]["interaction"]
+    assert interaction["status"] == "pending"
+    assert interaction["message_type"] == "follow_up"
+    assert interaction["cadence_step"] == "follow_up_1"
+    assert interaction["email_subject"] == "Retomando, Candidate One"
+    assert interaction["message_sent"] == "Olá Candidate One, retomando sobre Executiva de vendas."
+    assert created_payloads[0]["idempotency_key"] == "candidate-001:email:follow_up_1"
+    assert events[0]["event_type"] == "interaction.email_follow_up_prepared"
+
+
+def test_prepare_candidate_email_follow_up_requires_initial_send(monkeypatch) -> None:
+    monkeypatch.setattr(api, "get_candidate", lambda _candidate_id: {"id": "candidate-001", "tenant_id": "tenant-001", "name": "Candidate One", "email": "candidate@example.com", "metadata_json": {}})
+    monkeypatch.setattr(api, "get_tenant", lambda _tenant_id: {"id": "tenant-001", "metadata_json": {"mvp_limits": {"email_enabled": True}}})
+    monkeypatch.setattr(api, "list_candidate_interactions", lambda _candidate_id: [])
+    monkeypatch.setattr(api, "list_tenant_interactions", lambda _tenant_id, _page, _limit: {"items": [], "total": 0})
+
+    response = TestClient(api.app).post("/v1/candidates/candidate-001/email-follow-up")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Envie o e-mail inicial antes de preparar follow-up."
 
 
 def test_candidate_decision_route(monkeypatch) -> None:

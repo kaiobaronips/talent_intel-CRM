@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiMutation, getDefaultTenantId, reviewInteractionMessage, updateCandidateDecision, updateInteractionStatus, updateTenantMessageTemplates, updateTenantPreferences } from '@/lib/api';
+import { apiMutation, getDefaultTenantId, prepareCandidateEmailFollowUp, reviewInteractionMessage, updateCandidateDecision, updateInteractionStatus, updateTenantMessageTemplates, updateTenantPreferences } from '@/lib/api';
 import type { InteractionStatus } from '@/lib/types';
 import { getSessionToken, refreshCookieName, sessionCookieName } from '@/lib/session';
 import { authErrorMessage, requireSupabaseAuthConfig, revokeSupabaseSession, setSessionCookie, type SupabaseTokenPayload } from '@/lib/supabase-auth';
@@ -422,6 +422,7 @@ export async function reviewInteractionMessageAction(_previousState: ActionState
   const candidateId = text(formData, 'candidate_id');
   const interactionId = text(formData, 'interaction_id');
   const messageSent = text(formData, 'message_sent');
+  const subject = text(formData, 'subject');
   const decisionNote = text(formData, 'decision_note');
   const status = (text(formData, 'status') || 'approved') as 'draft' | 'pending' | 'approved';
 
@@ -429,13 +430,33 @@ export async function reviewInteractionMessageAction(_previousState: ActionState
     return { ...initialError, message: 'Informe a mensagem revisada antes de aprovar.' };
   }
 
-  const result = await reviewInteractionMessage(interactionId, status, messageSent, decisionNote, await authOptions());
+  const result = await reviewInteractionMessage(interactionId, status, messageSent, decisionNote, subject, await authOptions());
   if (!result.ok) {
     return { ok: false, message: result.message };
   }
 
   revalidateInteractionViews(tenantId, candidateId);
   return { ok: true, message: status === 'approved' ? 'Mensagem aprovada para envio.' : 'Mensagem salva como rascunho.' };
+}
+
+export async function prepareEmailFollowUpAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const candidateId = text(formData, 'candidate_id');
+
+  if (!candidateId) {
+    return { ...initialError, message: 'Candidato inválido para follow-up.' };
+  }
+
+  const result = await prepareCandidateEmailFollowUp(candidateId, await authOptions());
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateInteractionViews(tenantId, candidateId);
+  return {
+    ok: true,
+    message: result.data?.already_prepared ? 'Já existe um follow-up aguardando revisão.' : 'Follow-up preparado para revisão.',
+  };
 }
 
 export async function updateCandidateDecisionAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
