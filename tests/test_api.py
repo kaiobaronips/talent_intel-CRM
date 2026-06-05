@@ -579,6 +579,58 @@ def test_send_resend_email_sets_user_agent(monkeypatch) -> None:
     assert captured_headers["User-agent"] == "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)"
 
 
+def test_send_expandi_linkedin_message_posts_reversed_webhook(monkeypatch) -> None:
+    captured_headers: dict[str, str] = {}
+    captured_body: dict[str, object] = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b'{"lead_id":"lead-001"}'
+
+    def env_value(key, default=""):
+        values = {
+            "EXPANDI_REVERSED_WEBHOOK_URL": "https://expandi.example/webhook",
+            "EXPANDI_API_KEY": "expandi-key",
+            "EXPANDI_CAMPAIGN_ID": "campaign-001",
+        }
+        return values.get(key, default)
+
+    def urlopen(request, timeout):
+        captured_headers.update(dict(request.header_items()))
+        captured_body.update(json.loads(request.data.decode("utf-8")))
+        assert timeout == 30
+        return Response()
+
+    monkeypatch.setattr(api, "env", env_value)
+    monkeypatch.setattr(api.urllib.request, "urlopen", urlopen)
+
+    result = api._send_expandi_linkedin_message(
+        {
+            "candidate_id": "candidate-001",
+            "tenant_id": "tenant-001",
+            "message_type": "follow_up",
+            "payload_json": {
+                "name": "Candidate One",
+                "linkedin_url": "https://linkedin.com/in/candidate-one",
+                "message_sent": "Mensagem LinkedIn revisada.",
+                "cadence_step": "follow_up_1",
+            },
+        }
+    )
+
+    assert result == {"provider": "expandi", "provider_message_id": "lead-001", "executed": True}
+    assert captured_headers["Authorization"] == "Bearer expandi-key"
+    assert captured_headers["User-agent"] == "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)"
+    assert captured_body["campaign_id"] == "campaign-001"
+    assert captured_body["message"] == "Mensagem LinkedIn revisada."
+
+
 def test_sent_interaction_requires_approval(monkeypatch) -> None:
     monkeypatch.setattr(
         api,
@@ -663,6 +715,49 @@ def test_sent_email_interaction_requires_resend_configuration(monkeypatch) -> No
 
     assert response.status_code == 400
     assert "RESEND_API_KEY" in response.json()["detail"]
+
+
+def test_sent_linkedin_interaction_uses_expandi_when_configured(monkeypatch) -> None:
+    sent_payloads: list[dict[str, object]] = []
+    interaction = {
+        "id": "interaction-001",
+        "tenant_id": "tenant-001",
+        "candidate_id": "candidate-001",
+        "channel": "linkedin",
+        "status": "approved",
+        "payload_json": {
+            "linkedin_url": "https://linkedin.com/in/candidate-one",
+            "message_sent": "Mensagem LinkedIn aprovada.",
+            "manual_approval_status": "approved",
+        },
+    }
+    monkeypatch.setattr(api, "get_interaction", lambda _interaction_id: interaction)
+    monkeypatch.setattr(
+        api,
+        "_send_expandi_linkedin_message",
+        lambda payload: sent_payloads.append(payload) or {"provider": "expandi", "provider_message_id": "lead-001", "executed": True},
+    )
+
+    def update(interaction_id, status, payload_updates):
+        return {
+            **interaction,
+            "id": interaction_id,
+            "status": status,
+            "provider_message_id": None,
+            "payload_json": {**interaction["payload_json"], **payload_updates},
+        }
+
+    monkeypatch.setattr(api, "update_interaction_status", update)
+
+    response = TestClient(api.app).post("/v1/interactions/interaction-001/status", json={"status": "sent"})
+
+    assert response.status_code == 200
+    data = response.json()["data"]["interaction"]
+    assert data["status"] == "sent"
+    assert data["provider_message_id"] == "lead-001"
+    assert data["linkedin_provider"] == "expandi"
+    assert data["provider_executed"] is True
+    assert sent_payloads[0]["id"] == "interaction-001"
 
 
 def test_prepare_candidate_email_follow_up_creates_pending_message(monkeypatch) -> None:

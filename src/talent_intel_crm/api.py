@@ -669,6 +669,68 @@ def _send_resend_email(interaction: Dict[str, Any]) -> Dict[str, Any]:
     return {"provider": "resend", "provider_message_id": resend_id, "to": fields["to"], "subject": fields["subject"]}
 
 
+def _send_expandi_linkedin_message(interaction: Dict[str, Any]) -> Dict[str, Any]:
+    webhook_url = env("EXPANDI_REVERSED_WEBHOOK_URL") or env("LINKEDIN_SEND_WEBHOOK_URL")
+    if not webhook_url:
+        return {"provider": "manual", "provider_message_id": "", "executed": False}
+
+    payload = interaction.get("payload_json") or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    message = _message_preview(payload.get("message_sent")) or _message_preview(payload.get("message"))
+    linkedin_url = str(payload.get("linkedin_url") or "").strip()
+    if not linkedin_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta interação não tem URL do LinkedIn.")
+    if not message:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta interação não tem mensagem revisada para LinkedIn.")
+
+    request_payload: Dict[str, Any] = {
+        "candidate_id": str(interaction.get("candidate_id") or payload.get("candidate_id") or ""),
+        "tenant_id": str(interaction.get("tenant_id") or payload.get("tenant_id") or ""),
+        "name": str(payload.get("name") or ""),
+        "email": str(payload.get("email") or ""),
+        "linkedin_url": linkedin_url,
+        "message": message,
+        "message_type": str(interaction.get("message_type") or payload.get("message_type") or ""),
+        "cadence_step": str(payload.get("cadence_step") or ""),
+        "source": "talent-intel-crm",
+    }
+    campaign_id = env("EXPANDI_CAMPAIGN_ID")
+    if campaign_id:
+        request_payload["campaign_id"] = campaign_id
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)",
+    }
+    api_key = env("EXPANDI_API_KEY")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+        headers["X-API-Key"] = api_key
+
+    request = urllib.request.Request(
+        webhook_url,
+        data=json.dumps(request_payload, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers=headers,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            raw = response.read().decode("utf-8")
+            data = json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8") if exc.fp else ""
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Expandi retornou HTTP {exc.code}: {raw[:300]}") from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Falha ao enviar mensagem LinkedIn para o Expandi.") from exc
+
+    provider_id = ""
+    if isinstance(data, dict):
+        provider_id = str(data.get("id") or data.get("lead_id") or data.get("message_id") or data.get("request_id") or "").strip()
+    return {"provider": "expandi", "provider_message_id": provider_id, "executed": True}
+
+
 def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
     payload = interaction.get("payload_json") or {}
     if isinstance(payload, str):
@@ -814,6 +876,7 @@ async def read_connector_status(tenant_id: str, principal: APIPrincipal = Depend
     hunter_configured = bool(env("HUNTER_API_KEY"))
     openai_configured = bool(env("OPENAI_API_KEY"))
     openrouter_configured = bool(env("OPENROUTER_API_KEY"))
+    expandi_configured = bool(env("EXPANDI_REVERSED_WEBHOOK_URL") or env("LINKEDIN_SEND_WEBHOOK_URL"))
     llm_provider = (env("LLM_PROVIDER", "openai") or "openai").lower()
     temporal = TemporalConfig()
 
@@ -892,6 +955,16 @@ async def read_connector_status(tenant_id: str, principal: APIPrincipal = Depend
             last_result=f"Provider preferido: {llm_provider}. OpenAI: {'configurado' if openai_configured else 'pendente'}. OpenRouter: {'configurado' if openrouter_configured else 'pendente'}.",
             next_action="Manter pelo menos um provedor LLM configurado para classificação e copy.",
             metrics={"openai_configured": openai_configured, "openrouter_configured": openrouter_configured, "provider": llm_provider},
+        ),
+        _connector_item(
+            key="expandi",
+            name="Expandi",
+            configured=expandi_configured,
+            status_value="active" if expandi_configured else "offline",
+            summary="Executa mensagens aprovadas do LinkedIn por webhook de campanha.",
+            last_result="Webhook configurado para receber leads/mensagens." if expandi_configured else "Webhook do Expandi ainda não configurado.",
+            next_action="Enviar mensagens LinkedIn aprovadas pelo painel." if expandi_configured else "Configurar EXPANDI_REVERSED_WEBHOOK_URL na API.",
+            metrics={"webhook_configured": expandi_configured, "campaign_configured": bool(env("EXPANDI_CAMPAIGN_ID"))},
         ),
         _connector_item(
             key="temporal",
@@ -2021,6 +2094,12 @@ async def update_interaction_status_route(
             payload_updates["provider_message_id"] = resend_result.get("provider_message_id", "")
             payload_updates["email_sent_to"] = resend_result.get("to", "")
             payload_updates["email_subject"] = resend_result.get("subject", "")
+            payload_updates["sent_at"] = datetime.now(timezone.utc).isoformat()
+        elif interaction.get("channel") == CandidateChannel.LINKEDIN.value:
+            expandi_result = _send_expandi_linkedin_message(interaction)
+            payload_updates["linkedin_provider"] = expandi_result.get("provider", "manual")
+            payload_updates["provider_message_id"] = expandi_result.get("provider_message_id", "")
+            payload_updates["provider_executed"] = bool(expandi_result.get("executed"))
             payload_updates["sent_at"] = datetime.now(timezone.utc).isoformat()
         payload_updates["manual_approval_status"] = "sent"
     if payload.status == "replied":
