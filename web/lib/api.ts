@@ -201,6 +201,13 @@ export async function prepareCandidateEmailFollowUp(
   return apiMutation<{ interaction: Interaction; already_prepared: boolean }>(`/v1/candidates/${candidateId}/email-follow-up`, 'POST', {}, options);
 }
 
+export async function prepareCandidateLinkedInFollowUp(
+  candidateId: string,
+  options: ApiAuthOptions = {},
+): Promise<ApiMutationResult<{ interaction: Interaction; already_prepared: boolean }>> {
+  return apiMutation<{ interaction: Interaction; already_prepared: boolean }>(`/v1/candidates/${candidateId}/linkedin-follow-up`, 'POST', {}, options);
+}
+
 export async function updateCandidateDecision(
   candidateId: string,
   decision: 'active' | 'paused' | 'discarded',

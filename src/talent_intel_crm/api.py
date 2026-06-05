@@ -552,6 +552,18 @@ def _follow_up_message(candidate: Dict[str, Any], tenant_id: str, step: str) -> 
     }
 
 
+def _linkedin_follow_up_message(candidate: Dict[str, Any], tenant_id: str, step: str) -> Dict[str, str]:
+    metadata = _tenant_metadata(tenant_id)
+    templates = metadata.get("message_templates") if isinstance(metadata.get("message_templates"), dict) else {}
+    template = templates.get("linkedin_follow_up_message") or "Olá {{nome}}, passando só para retomar minha mensagem. Se preferir, posso enviar um resumo da oportunidade por aqui."
+    return {
+        "text": _render_outreach_template(str(template), candidate),
+        "language": "pt-BR",
+        "template_status": "tenant_template",
+        "cadence_step": step,
+    }
+
+
 def _sent_today_count(tenant_id: str) -> int:
     today = datetime.now(timezone.utc).date().isoformat()
     result = list_tenant_interactions(tenant_id, 1, 100)
@@ -564,18 +576,18 @@ def _sent_today_count(tenant_id: str) -> int:
     return count
 
 
-def _next_email_follow_up_step(interactions: List[Dict[str, Any]]) -> tuple[str, Optional[Dict[str, Any]]]:
-    email_follow_ups = [
+def _next_follow_up_step(interactions: List[Dict[str, Any]], channel: CandidateChannel) -> tuple[str, Optional[Dict[str, Any]]]:
+    follow_ups = [
         interaction
         for interaction in interactions
-        if interaction.get("channel") == CandidateChannel.EMAIL.value and interaction.get("message_type") == "follow_up"
+        if interaction.get("channel") == channel.value and interaction.get("message_type") == "follow_up"
     ]
-    for interaction in email_follow_ups:
+    for interaction in follow_ups:
         if interaction.get("status") in {"draft", "pending", "approved"}:
             return "", interaction
     completed_steps = {
         str((interaction.get("payload_json") or {}).get("cadence_step") or "")
-        for interaction in email_follow_ups
+        for interaction in follow_ups
         if interaction.get("status") in {"sent", "replied", "closed"}
     }
     for step in FOLLOW_UP_STEPS:
@@ -1868,7 +1880,7 @@ async def prepare_candidate_email_follow_up(candidate_id: str, principal: APIPri
     if any(interaction.get("status") == "replied" for interaction in email_interactions):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O candidato já respondeu. Use o acompanhamento manual da resposta.")
 
-    step, existing = _next_email_follow_up_step(interactions)
+    step, existing = _next_follow_up_step(interactions, CandidateChannel.EMAIL)
     if existing:
         return _success({"interaction": _interaction_projection(existing), "already_prepared": True})
     max_follow_ups = max(0, min(int(limits.get("max_attempts_per_candidate") or len(FOLLOW_UP_STEPS)), len(FOLLOW_UP_STEPS)))
@@ -1902,6 +1914,68 @@ async def prepare_candidate_email_follow_up(candidate_id: str, principal: APIPri
         event_type="interaction.email_follow_up_prepared",
         principal=principal,
         payload={"interaction_id": created.get("id"), "cadence_step": step, "scheduled_after_days": payload["scheduled_after_days"]},
+    )
+    return _success({"interaction": _interaction_projection(interaction), "already_prepared": False})
+
+
+@app.post("/v1/candidates/{candidate_id}/linkedin-follow-up", status_code=status.HTTP_201_CREATED)
+async def prepare_candidate_linkedin_follow_up(candidate_id: str, principal: APIPrincipal = Depends(require_principal)) -> Dict[str, Any]:
+    candidate = get_candidate(candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+    tenant_id = candidate["tenant_id"]
+    authorize_tenant(principal, tenant_id)
+    if not str(candidate.get("linkedin_url") or "").strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O candidato não tem LinkedIn para follow-up.")
+
+    metadata = _tenant_metadata(tenant_id)
+    limits = metadata.get("mvp_limits") if isinstance(metadata.get("mvp_limits"), dict) else {}
+    if limits.get("linkedin_enabled") is False:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="LinkedIn está desabilitado nas preferências do MVP.")
+
+    interactions = list_candidate_interactions(candidate_id)
+    linkedin_interactions = [interaction for interaction in interactions if interaction.get("channel") == CandidateChannel.LINKEDIN.value]
+    has_sent_linkedin = any(interaction.get("status") in {"sent", "replied", "closed"} for interaction in linkedin_interactions)
+    if not has_sent_linkedin:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Marque a mensagem inicial do LinkedIn como enviada antes de preparar follow-up.")
+    if any(interaction.get("status") == "replied" for interaction in linkedin_interactions):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O candidato já respondeu no LinkedIn. Use o acompanhamento manual da resposta.")
+
+    step, existing = _next_follow_up_step(interactions, CandidateChannel.LINKEDIN)
+    if existing:
+        return _success({"interaction": _interaction_projection(existing), "already_prepared": True})
+    max_follow_ups = max(0, min(int(limits.get("max_attempts_per_candidate") or len(FOLLOW_UP_STEPS)), len(FOLLOW_UP_STEPS)))
+    if not step or FOLLOW_UP_STEPS.index(step) >= max_follow_ups:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não há novos follow-ups de LinkedIn disponíveis para este candidato.")
+
+    message = _linkedin_follow_up_message(candidate, tenant_id, step)
+    payload = {
+        "tenant_id": tenant_id,
+        "candidate_id": candidate_id,
+        "name": candidate.get("name", ""),
+        "email": candidate.get("email", ""),
+        "city": candidate.get("city", ""),
+        "linkedin_url": candidate.get("linkedin_url", ""),
+        "channel": CandidateChannel.LINKEDIN.value,
+        "message_type": "follow_up",
+        "cadence_step": step,
+        "status": "pending",
+        "manual_approval_status": "pending",
+        "message": message,
+        "message_sent": message["text"],
+        "next_action": "Revisar e aprovar follow-up no LinkedIn",
+        "idempotency_key": f"{candidate_id}:linkedin:{step}",
+        "scheduled_after_days": int(limits.get("follow_up_interval_days") or 5),
+        "provider_target": "expandi",
+    }
+    created = append_interaction_row(payload)
+    interaction = get_interaction(str(created.get("id"))) if created.get("id") else created
+    _record_audit_event(
+        tenant_id=tenant_id,
+        candidate_id=candidate_id,
+        event_type="interaction.linkedin_follow_up_prepared",
+        principal=principal,
+        payload={"interaction_id": created.get("id"), "cadence_step": step, "provider_target": "expandi", "scheduled_after_days": payload["scheduled_after_days"]},
     )
     return _success({"interaction": _interaction_projection(interaction), "already_prepared": False})
 

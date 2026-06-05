@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { InteractionReviewForm } from '@/components/InteractionReviewForm';
 import { InteractionStatusForms } from '@/components/InteractionStatusForms';
 import { PrepareEmailFollowUpForm } from '@/components/PrepareEmailFollowUpForm';
+import { PrepareLinkedInFollowUpForm } from '@/components/PrepareLinkedInFollowUpForm';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatDateTime } from '@/lib/format';
 import type { Interaction } from '@/lib/types';
@@ -31,6 +32,13 @@ function cadenceLabel(value?: string | null) {
   if (value === 'follow_up_2') return 'Follow-up 2';
   if (value === 'follow_up_3') return 'Follow-up 3 - despedida';
   return '';
+}
+
+function destinationValue(interaction: Interaction) {
+  if (interaction.channel === 'linkedin') {
+    return cleanValue((interaction.payload_json?.linkedin_url as string | undefined) ?? null);
+  }
+  return cleanValue(interaction.email_sent_to ?? (interaction.payload_json?.email as string | undefined));
 }
 
 export function InteractionContactCards({ interactions, tenantId, showCandidateLink = false }: InteractionContactCardsProps) {
@@ -85,7 +93,7 @@ export function InteractionContactCards({ interactions, tenantId, showCandidateL
                   </div>
                   <div className="rounded-lg bg-white p-4">
                     <p className="text-xs font-bold uppercase text-stone-500">Destino</p>
-                    <p className="mt-2 break-words text-sm font-bold text-stone-950">{cleanValue(interaction.email_sent_to ?? (interaction.payload_json?.email as string | undefined))}</p>
+                    <p className="mt-2 break-words text-sm font-bold text-stone-950">{destinationValue(interaction)}</p>
                   </div>
                   <div className="rounded-lg bg-white p-4">
                     <p className="text-xs font-bold uppercase text-stone-500">Resposta</p>
@@ -107,6 +115,7 @@ export function InteractionContactCards({ interactions, tenantId, showCandidateL
               <div className="mt-3 flex flex-wrap gap-2 border-t border-stone-200 pt-4">
                 <InteractionStatusForms interaction={interaction} tenantId={tenantId} />
                 <PrepareEmailFollowUpForm interaction={interaction} tenantId={tenantId} />
+                <PrepareLinkedInFollowUpForm interaction={interaction} tenantId={tenantId} />
               </div>
             </article>
           ))}

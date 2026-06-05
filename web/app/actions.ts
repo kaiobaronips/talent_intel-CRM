@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiMutation, getDefaultTenantId, prepareCandidateEmailFollowUp, reviewInteractionMessage, updateCandidateDecision, updateInteractionStatus, updateTenantMessageTemplates, updateTenantPreferences } from '@/lib/api';
+import { apiMutation, getDefaultTenantId, prepareCandidateEmailFollowUp, prepareCandidateLinkedInFollowUp, reviewInteractionMessage, updateCandidateDecision, updateInteractionStatus, updateTenantMessageTemplates, updateTenantPreferences } from '@/lib/api';
 import type { InteractionStatus } from '@/lib/types';
 import { getSessionToken, refreshCookieName, sessionCookieName } from '@/lib/session';
 import { authErrorMessage, requireSupabaseAuthConfig, revokeSupabaseSession, setSessionCookie, type SupabaseTokenPayload } from '@/lib/supabase-auth';
@@ -456,6 +456,26 @@ export async function prepareEmailFollowUpAction(_previousState: ActionState, fo
   return {
     ok: true,
     message: result.data?.already_prepared ? 'Já existe um follow-up aguardando revisão.' : 'Follow-up preparado para revisão.',
+  };
+}
+
+export async function prepareLinkedInFollowUpAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const tenantId = text(formData, 'tenant_id') || getDefaultTenantId();
+  const candidateId = text(formData, 'candidate_id');
+
+  if (!candidateId) {
+    return { ...initialError, message: 'Candidato inválido para follow-up no LinkedIn.' };
+  }
+
+  const result = await prepareCandidateLinkedInFollowUp(candidateId, await authOptions());
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidateInteractionViews(tenantId, candidateId);
+  return {
+    ok: true,
+    message: result.data?.already_prepared ? 'Já existe um follow-up de LinkedIn aguardando revisão.' : 'Follow-up de LinkedIn preparado para revisão.',
   };
 }
 

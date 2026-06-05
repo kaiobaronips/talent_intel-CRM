@@ -740,6 +740,88 @@ def test_prepare_candidate_email_follow_up_requires_initial_send(monkeypatch) ->
     assert response.json()["detail"] == "Envie o e-mail inicial antes de preparar follow-up."
 
 
+def test_prepare_candidate_linkedin_follow_up_creates_pending_message(monkeypatch) -> None:
+    events: list[dict[str, object]] = []
+    candidate = {
+        "id": "candidate-001",
+        "tenant_id": "tenant-001",
+        "name": "Candidate One",
+        "linkedin_url": "https://linkedin.com/in/candidate-one",
+        "metadata_json": {"current_role": "Executiva de vendas"},
+    }
+    created_payloads: list[dict[str, object]] = []
+    monkeypatch.setattr(api, "append_audit_event", lambda payload: events.append(payload) or {"id": "audit-1", **payload})
+    monkeypatch.setattr(api, "get_candidate", lambda _candidate_id: candidate)
+    monkeypatch.setattr(
+        api,
+        "get_tenant",
+        lambda _tenant_id: {
+            "id": "tenant-001",
+            "metadata_json": {
+                "mvp_limits": {"max_attempts_per_candidate": 3, "linkedin_enabled": True},
+                "message_templates": {"linkedin_follow_up_message": "Olá {{nome}}, retomando pelo LinkedIn sobre {{cargo}}."},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        api,
+        "list_candidate_interactions",
+        lambda _candidate_id: [
+            {
+                "id": "linkedin-initial-001",
+                "tenant_id": "tenant-001",
+                "candidate_id": "candidate-001",
+                "channel": "linkedin",
+                "message_type": "initial",
+                "status": "sent",
+                "payload_json": {},
+            }
+        ],
+    )
+
+    def append(payload):
+        created_payloads.append(payload)
+        return {"id": "linkedin-follow-001", **payload}
+
+    monkeypatch.setattr(api, "append_interaction_row", append)
+    monkeypatch.setattr(
+        api,
+        "get_interaction",
+        lambda _interaction_id: {
+            "id": "linkedin-follow-001",
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "channel": "linkedin",
+            "message_type": "follow_up",
+            "status": "pending",
+            "payload_json": created_payloads[0],
+        },
+    )
+
+    response = TestClient(api.app).post("/v1/candidates/candidate-001/linkedin-follow-up")
+
+    assert response.status_code == 201
+    interaction = response.json()["data"]["interaction"]
+    assert interaction["status"] == "pending"
+    assert interaction["message_type"] == "follow_up"
+    assert interaction["cadence_step"] == "follow_up_1"
+    assert interaction["message_sent"] == "Olá Candidate One, retomando pelo LinkedIn sobre Executiva de vendas."
+    assert created_payloads[0]["idempotency_key"] == "candidate-001:linkedin:follow_up_1"
+    assert created_payloads[0]["provider_target"] == "expandi"
+    assert events[0]["event_type"] == "interaction.linkedin_follow_up_prepared"
+
+
+def test_prepare_candidate_linkedin_follow_up_requires_initial_send(monkeypatch) -> None:
+    monkeypatch.setattr(api, "get_candidate", lambda _candidate_id: {"id": "candidate-001", "tenant_id": "tenant-001", "name": "Candidate One", "linkedin_url": "https://linkedin.com/in/candidate-one", "metadata_json": {}})
+    monkeypatch.setattr(api, "get_tenant", lambda _tenant_id: {"id": "tenant-001", "metadata_json": {"mvp_limits": {"linkedin_enabled": True}}})
+    monkeypatch.setattr(api, "list_candidate_interactions", lambda _candidate_id: [])
+
+    response = TestClient(api.app).post("/v1/candidates/candidate-001/linkedin-follow-up")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Marque a mensagem inicial do LinkedIn como enviada antes de preparar follow-up."
+
+
 def test_candidate_decision_route(monkeypatch) -> None:
     events: list[dict[str, object]] = []
     monkeypatch.setattr(api, "append_audit_event", lambda payload: events.append(payload) or {"id": "audit-1", **payload})
