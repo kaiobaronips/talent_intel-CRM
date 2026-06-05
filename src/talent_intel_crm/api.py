@@ -677,6 +677,11 @@ def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
         next_action = "Enviar mensagem pelo LinkedIn" if channel == "linkedin" else "Enviar e-mail inicial"
 
     projected = {**payload, **interaction}
+    if projected.get("id") is not None:
+        projected["id"] = str(projected["id"])
+    if projected.get("created_at") is not None:
+        created_at = projected["created_at"]
+        projected["created_at"] = created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at)
     projected["payload_json"] = payload
     projected["candidate_name"] = candidate_name
     projected["interaction_status"] = status_value

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 import pytest
@@ -522,6 +524,24 @@ def test_resend_message_fields_prefer_reviewed_message_sent() -> None:
     )
 
     assert fields == {"to": "candidate@example.com", "subject": "Convite rápido", "text": "Mensagem revisada."}
+
+
+def test_interaction_projection_serializes_database_types() -> None:
+    projected = api._interaction_projection(
+        {
+            "id": UUID("11111111-1111-1111-1111-111111111111"),
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "channel": "email",
+            "message_type": "follow_up",
+            "status": "pending",
+            "created_at": datetime(2026, 6, 5, tzinfo=timezone.utc),
+            "payload_json": {"message_sent": "Mensagem preparada."},
+        }
+    )
+
+    assert projected["id"] == "11111111-1111-1111-1111-111111111111"
+    assert projected["created_at"] == "2026-06-05T00:00:00+00:00"
 
 
 def test_send_resend_email_sets_user_agent(monkeypatch) -> None:
