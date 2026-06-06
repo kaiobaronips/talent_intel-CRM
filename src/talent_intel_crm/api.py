@@ -708,6 +708,10 @@ def _send_expandi_linkedin_message(interaction: Dict[str, Any]) -> Dict[str, Any
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
         headers["X-API-Key"] = api_key
+    api_secret = env("EXPANDI_API_SECRET")
+    if api_secret:
+        headers["X-API-Secret"] = api_secret
+        headers["X-Expandi-API-Secret"] = api_secret
 
     request = urllib.request.Request(
         webhook_url,
@@ -876,7 +880,10 @@ async def read_connector_status(tenant_id: str, principal: APIPrincipal = Depend
     hunter_configured = bool(env("HUNTER_API_KEY"))
     openai_configured = bool(env("OPENAI_API_KEY"))
     openrouter_configured = bool(env("OPENROUTER_API_KEY"))
-    expandi_configured = bool(env("EXPANDI_REVERSED_WEBHOOK_URL") or env("LINKEDIN_SEND_WEBHOOK_URL"))
+    expandi_webhook_configured = bool(env("EXPANDI_REVERSED_WEBHOOK_URL") or env("LINKEDIN_SEND_WEBHOOK_URL"))
+    expandi_api_key_configured = bool(env("EXPANDI_API_KEY"))
+    expandi_api_secret_configured = bool(env("EXPANDI_API_SECRET"))
+    expandi_credentials_configured = expandi_api_key_configured and expandi_api_secret_configured
     llm_provider = (env("LLM_PROVIDER", "openai") or "openai").lower()
     temporal = TemporalConfig()
 
@@ -959,12 +966,17 @@ async def read_connector_status(tenant_id: str, principal: APIPrincipal = Depend
         _connector_item(
             key="expandi",
             name="Expandi",
-            configured=expandi_configured,
-            status_value="active" if expandi_configured else "offline",
+            configured=expandi_credentials_configured or expandi_webhook_configured,
+            status_value="active" if expandi_webhook_configured else "pending" if expandi_credentials_configured else "offline",
             summary="Executa mensagens aprovadas do LinkedIn por webhook de campanha.",
-            last_result="Webhook configurado para receber leads/mensagens." if expandi_configured else "Webhook do Expandi ainda não configurado.",
-            next_action="Enviar mensagens LinkedIn aprovadas pelo painel." if expandi_configured else "Configurar EXPANDI_REVERSED_WEBHOOK_URL na API.",
-            metrics={"webhook_configured": expandi_configured, "campaign_configured": bool(env("EXPANDI_CAMPAIGN_ID"))},
+            last_result="Webhook configurado para receber leads/mensagens." if expandi_webhook_configured else "Credenciais configuradas; falta a URL de webhook da campanha." if expandi_credentials_configured else "Credenciais e webhook do Expandi ainda não configurados.",
+            next_action="Enviar mensagens LinkedIn aprovadas pelo painel." if expandi_webhook_configured else "Criar campanha no Expandi e configurar EXPANDI_REVERSED_WEBHOOK_URL na API." if expandi_credentials_configured else "Configurar EXPANDI_API_KEY, EXPANDI_API_SECRET e webhook da campanha.",
+            metrics={
+                "api_key_configured": expandi_api_key_configured,
+                "api_secret_configured": expandi_api_secret_configured,
+                "webhook_configured": expandi_webhook_configured,
+                "campaign_configured": bool(env("EXPANDI_CAMPAIGN_ID")),
+            },
         ),
         _connector_item(
             key="temporal",

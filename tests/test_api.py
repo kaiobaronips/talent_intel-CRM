@@ -597,6 +597,7 @@ def test_send_expandi_linkedin_message_posts_reversed_webhook(monkeypatch) -> No
         values = {
             "EXPANDI_REVERSED_WEBHOOK_URL": "https://expandi.example/webhook",
             "EXPANDI_API_KEY": "expandi-key",
+            "EXPANDI_API_SECRET": "expandi-secret",
             "EXPANDI_CAMPAIGN_ID": "campaign-001",
         }
         return values.get(key, default)
@@ -626,6 +627,8 @@ def test_send_expandi_linkedin_message_posts_reversed_webhook(monkeypatch) -> No
 
     assert result == {"provider": "expandi", "provider_message_id": "lead-001", "executed": True}
     assert captured_headers["Authorization"] == "Bearer expandi-key"
+    assert captured_headers["X-api-secret"] == "expandi-secret"
+    assert captured_headers["X-expandi-api-secret"] == "expandi-secret"
     assert captured_headers["User-agent"] == "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)"
     assert captured_body["campaign_id"] == "campaign-001"
     assert captured_body["message"] == "Mensagem LinkedIn revisada."
