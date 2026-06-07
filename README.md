@@ -82,7 +82,7 @@ As activities usam `Supabase Postgres` como persistencia principal e webhooks op
 - `RESEND_FROM_EMAIL` default: `Talent Intel CRM <onboarding@resend.dev>`
 - `RESEND_REPLY_TO_EMAIL`
 - `LINKEDIN_SEND_WEBHOOK_URL`
-- `EXPANDI_REVERSED_WEBHOOK_URL` para enviar mensagens aprovadas do LinkedIn ao Expandi
+- `EXPANDI_REVERSED_WEBHOOK_URL` URL de reversed webhook da campanha Connector no Expandi; o CRM envia `profile_link` com a URL do LinkedIn e os campos de auditoria da cadencia
 - `EXPANDI_API_KEY` opcional, enviada como `Authorization: Bearer` e `X-API-Key`
 - `EXPANDI_API_SECRET` opcional, enviada como `X-API-Secret` e `X-Expandi-API-Secret`
 - `EXPANDI_CAMPAIGN_ID` opcional, incluída no payload do webhook

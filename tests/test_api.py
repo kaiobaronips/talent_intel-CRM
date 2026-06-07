@@ -631,6 +631,7 @@ def test_send_expandi_linkedin_message_posts_reversed_webhook(monkeypatch) -> No
     assert captured_headers["X-expandi-api-secret"] == "expandi-secret"
     assert captured_headers["User-agent"] == "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)"
     assert captured_body["campaign_id"] == "campaign-001"
+    assert captured_body["profile_link"] == "https://linkedin.com/in/candidate-one"
     assert captured_body["message"] == "Mensagem LinkedIn revisada."
 
 

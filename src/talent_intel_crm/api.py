@@ -685,6 +685,7 @@ def _send_expandi_linkedin_message(interaction: Dict[str, Any]) -> Dict[str, Any
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta interação não tem mensagem revisada para LinkedIn.")
 
     request_payload: Dict[str, Any] = {
+        "profile_link": linkedin_url,
         "candidate_id": str(interaction.get("candidate_id") or payload.get("candidate_id") or ""),
         "tenant_id": str(interaction.get("tenant_id") or payload.get("tenant_id") or ""),
         "name": str(payload.get("name") or ""),
