@@ -705,14 +705,15 @@ def _send_expandi_linkedin_message(interaction: Dict[str, Any]) -> Dict[str, Any
         "Accept": "application/json",
         "User-Agent": "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)",
     }
-    api_key = env("EXPANDI_API_KEY")
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-        headers["X-API-Key"] = api_key
-    api_secret = env("EXPANDI_API_SECRET")
-    if api_secret:
-        headers["X-API-Secret"] = api_secret
-        headers["X-Expandi-API-Secret"] = api_secret
+    if not env("EXPANDI_REVERSED_WEBHOOK_URL"):
+        api_key = env("EXPANDI_API_KEY")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            headers["X-API-Key"] = api_key
+        api_secret = env("EXPANDI_API_SECRET")
+        if api_secret:
+            headers["X-API-Secret"] = api_secret
+            headers["X-Expandi-API-Secret"] = api_secret
 
     request = urllib.request.Request(
         webhook_url,
