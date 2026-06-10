@@ -2433,11 +2433,17 @@ async def sync_expandi_status(
             lookup_payload[key] = value
     interaction = find_linkedin_interaction_for_status(lookup_payload)
     if not interaction:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LinkedIn interaction not found for Expandi status")
+        return _success(
+            {
+                "matched": False,
+                "reason": "LinkedIn interaction not found for Expandi status",
+                "provider_status_raw": payload.status or payload.event or lookup_payload.get("event_type") or lookup_payload.get("event") or "unknown",
+            }
+        )
     authorize_tenant(principal, interaction["tenant_id"])
 
     updated = _apply_expandi_status(interaction, payload, principal)
-    return _success({"interaction": _interaction_projection(updated)})
+    return _success({"matched": True, "interaction": _interaction_projection(updated)})
 
 
 @app.post("/v1/tenants/{tenant_id}/providers/expandi/poll")

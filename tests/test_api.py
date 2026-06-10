@@ -745,6 +745,21 @@ def test_sync_expandi_status_accepts_query_secret_and_extra_payload(monkeypatch)
     assert data["response_received"] == "Tenho interesse."
 
 
+def test_sync_expandi_status_returns_success_for_unmatched_test_payload(monkeypatch) -> None:
+    monkeypatch.setattr(api, "env", lambda key, default="": "webhook-secret" if key == "EXPANDI_STATUS_WEBHOOK_SECRET" else default)
+    monkeypatch.setattr(api, "find_linkedin_interaction_for_status", lambda _payload: {})
+
+    response = TestClient(api.app).post(
+        "/v1/providers/expandi/status?secret=webhook-secret",
+        json={"event_type": "Contact Replied", "example": True},
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["matched"] is False
+    assert data["reason"] == "LinkedIn interaction not found for Expandi status"
+
+
 def test_poll_expandi_status_updates_matching_interactions(monkeypatch) -> None:
     events: list[dict[str, object]] = []
     interaction = {
