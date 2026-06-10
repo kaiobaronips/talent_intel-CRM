@@ -613,6 +613,7 @@ def test_send_expandi_linkedin_message_posts_reversed_webhook(monkeypatch) -> No
 
     result = api._send_expandi_linkedin_message(
         {
+            "id": "interaction-001",
             "candidate_id": "candidate-001",
             "tenant_id": "tenant-001",
             "message_type": "follow_up",
@@ -632,8 +633,77 @@ def test_send_expandi_linkedin_message_posts_reversed_webhook(monkeypatch) -> No
     assert "X-expandi-api-secret" not in captured_headers
     assert captured_headers["User-agent"] == "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)"
     assert captured_body["campaign_id"] == "campaign-001"
+    assert captured_body["interaction_id"] == "interaction-001"
     assert captured_body["profile_link"] == "https://linkedin.com/in/candidate-one"
     assert captured_body["message"] == "Mensagem LinkedIn revisada."
+
+
+def test_sync_expandi_status_updates_linkedin_interaction(monkeypatch) -> None:
+    events: list[dict[str, object]] = []
+    interaction = {
+        "id": "interaction-001",
+        "tenant_id": "tenant-001",
+        "candidate_id": "candidate-001",
+        "channel": "linkedin",
+        "message_type": "initial",
+        "status": "sent",
+        "provider_message_id": "lead-001",
+        "provider_thread_id": None,
+        "idempotency_key": "idem-001",
+        "payload_json": {
+            "name": "Candidate One",
+            "linkedin_provider": "expandi",
+            "provider_executed": True,
+        },
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    monkeypatch.setattr(api, "env", lambda key, default="": "webhook-secret" if key == "EXPANDI_STATUS_WEBHOOK_SECRET" else default)
+    monkeypatch.setattr(api, "find_linkedin_interaction_for_status", lambda payload: interaction if payload["interaction_id"] == "interaction-001" else {})
+
+    def update(interaction_id, status, payload_updates):
+        return {
+            **interaction,
+            "id": interaction_id,
+            "status": status,
+            "payload_json": {**interaction["payload_json"], **payload_updates, "status": status},
+        }
+
+    monkeypatch.setattr(api, "update_interaction_status", update)
+    monkeypatch.setattr(api, "append_audit_event", lambda payload: events.append(payload) or {"id": "audit-1", **payload})
+
+    response = TestClient(api.app).post(
+        "/v1/providers/expandi/status",
+        headers={"X-Expandi-Webhook-Secret": "webhook-secret"},
+        json={
+            "interaction_id": "interaction-001",
+            "tenant_id": "tenant-001",
+            "candidate_id": "candidate-001",
+            "lead_id": "lead-001",
+            "status": "invitation_sent",
+            "event": "connection_request_sent",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]["interaction"]
+    assert data["status"] == "sent"
+    assert data["provider_status"] == "invitation_sent"
+    assert data["provider_status_label"] == "Convite enviado"
+    assert data["provider_message_id"] == "lead-001"
+    assert events[0]["event_type"] == "interaction.expandi_status_synced"
+
+
+def test_sync_expandi_status_rejects_invalid_secret(monkeypatch) -> None:
+    monkeypatch.setattr(api, "env", lambda key, default="": "webhook-secret" if key == "EXPANDI_STATUS_WEBHOOK_SECRET" else default)
+
+    response = TestClient(api.app).post(
+        "/v1/providers/expandi/status",
+        headers={"X-Expandi-Webhook-Secret": "wrong-secret"},
+        json={"interaction_id": "interaction-001", "status": "queued"},
+    )
+
+    assert response.status_code == 401
 
 
 def test_sent_interaction_requires_approval(monkeypatch) -> None:

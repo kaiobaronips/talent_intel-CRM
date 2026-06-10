@@ -88,6 +88,11 @@ export type Interaction = {
   provider_thread_id?: string | null;
   linkedin_provider?: string | null;
   provider_executed?: boolean | null;
+  provider_status?: string | null;
+  provider_status_label?: string | null;
+  provider_status_raw?: string | null;
+  provider_status_synced_at?: string | null;
+  provider_status_reason?: string | null;
   cadence_step?: string | null;
   scheduled_after_days?: number | null;
   payload_json?: Record<string, unknown> | null;

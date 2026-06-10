@@ -26,6 +26,7 @@ from talent_intel_crm.db import (
     find_auth_user_by_email,
     get_candidate,
     get_interaction,
+    find_linkedin_interaction_for_status,
     get_tenant,
     insert_tenant_api_key,
     list_candidate_interactions,
@@ -121,6 +122,22 @@ class InteractionReviewRequest(BaseModel):
     message_sent: str = Field(min_length=1, max_length=4000)
     subject: str = Field(default="", max_length=500)
     decision_note: str = Field(default="", max_length=1000)
+
+
+class ExpandiStatusSyncRequest(BaseModel):
+    interaction_id: str = Field(default="", max_length=160)
+    tenant_id: str = Field(default="", max_length=120)
+    candidate_id: str = Field(default="", max_length=160)
+    lead_id: str = Field(default="", max_length=240)
+    message_id: str = Field(default="", max_length=240)
+    messenger_id: str = Field(default="", max_length=240)
+    provider_message_id: str = Field(default="", max_length=240)
+    status: str = Field(default="", max_length=120)
+    event: str = Field(default="", max_length=120)
+    reason: str = Field(default="", max_length=1000)
+    message: str = Field(default="", max_length=4000)
+    response_received: str = Field(default="", max_length=4000)
+    raw: Dict[str, Any] = Field(default_factory=dict)
 
 
 class CandidateDecisionRequest(BaseModel):
@@ -685,6 +702,7 @@ def _send_expandi_linkedin_message(interaction: Dict[str, Any]) -> Dict[str, Any
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta interação não tem mensagem revisada para LinkedIn.")
 
     request_payload: Dict[str, Any] = {
+        "interaction_id": str(interaction.get("id") or ""),
         "profile_link": linkedin_url,
         "candidate_id": str(interaction.get("candidate_id") or payload.get("candidate_id") or ""),
         "tenant_id": str(interaction.get("tenant_id") or payload.get("tenant_id") or ""),
@@ -735,6 +753,65 @@ def _send_expandi_linkedin_message(interaction: Dict[str, Any]) -> Dict[str, Any
     if isinstance(data, dict):
         provider_id = str(data.get("id") or data.get("lead_id") or data.get("message_id") or data.get("request_id") or "").strip()
     return {"provider": "expandi", "provider_message_id": provider_id, "executed": True}
+
+
+def _normalize_expandi_status(raw_status: str, raw_event: str = "") -> Dict[str, str]:
+    raw = f"{raw_status} {raw_event}".strip().lower()
+    raw = raw.replace("-", "_").replace(" ", "_")
+
+    if any(token in raw for token in ("reply", "replied", "response", "responded", "message_received")):
+        return {"provider_status": "replied", "interaction_status": "replied", "label": "Resposta recebida"}
+    if any(token in raw for token in ("connected", "accepted", "connection_accepted")):
+        return {"provider_status": "connected", "interaction_status": "sent", "label": "Conectado"}
+    if any(token in raw for token in ("invitation_sent", "invite_sent", "connection_sent", "request_sent", "message_sent", "sent")):
+        return {"provider_status": "invitation_sent", "interaction_status": "sent", "label": "Convite enviado"}
+    if any(token in raw for token in ("failed", "error", "bounced", "blocked", "not_found", "invalid")):
+        return {"provider_status": "failed", "interaction_status": "failed", "label": "Falhou no Expandi"}
+    if any(token in raw for token in ("paused", "stopped", "limit", "restricted", "throttled")):
+        return {"provider_status": "paused", "interaction_status": "paused", "label": "Pausado por limite"}
+    if any(token in raw for token in ("queued", "queue", "imported", "running", "scheduled", "pending", "processing")):
+        return {"provider_status": "queued", "interaction_status": "sent", "label": "Na fila do LinkedIn"}
+
+    return {"provider_status": "synced", "interaction_status": "sent", "label": "Status sincronizado"}
+
+
+def _expandi_status_payload(payload: ExpandiStatusSyncRequest) -> Dict[str, Any]:
+    raw_payload = payload.model_dump(exclude_none=True)
+    raw = payload.raw if isinstance(payload.raw, dict) else {}
+    provider_message_id = (
+        payload.provider_message_id
+        or payload.lead_id
+        or payload.message_id
+        or payload.messenger_id
+        or str(raw.get("provider_message_id") or raw.get("lead_id") or raw.get("message_id") or raw.get("messenger_id") or "")
+    ).strip()
+    raw_status = payload.status or str(raw.get("status") or raw.get("running_status") or raw.get("campaign_running_status") or "")
+    raw_event = payload.event or str(raw.get("event") or raw.get("type") or raw.get("event_type") or "")
+    normalized = _normalize_expandi_status(raw_status, raw_event)
+    response_received = payload.response_received or payload.message or str(raw.get("response_received") or raw.get("message") or "")
+
+    updates: Dict[str, Any] = {
+        "linkedin_provider": "expandi",
+        "provider_executed": True,
+        "provider_status": normalized["provider_status"],
+        "provider_status_label": normalized["label"],
+        "provider_status_raw": raw_status or raw_event or "unknown",
+        "provider_event_type": raw_event,
+        "provider_status_synced_at": datetime.now(timezone.utc).isoformat(),
+        "provider_payload": raw_payload,
+        "manual_approval_status": normalized["interaction_status"],
+    }
+    if provider_message_id:
+        updates["provider_message_id"] = provider_message_id
+        updates["lead_id"] = provider_message_id
+    if payload.reason:
+        updates["provider_status_reason"] = payload.reason
+    if response_received and normalized["provider_status"] == "replied":
+        updates["response_received"] = response_received
+    if normalized["provider_status"] == "invitation_sent":
+        updates["linkedin_sent_at"] = datetime.now(timezone.utc).isoformat()
+
+    return {"interaction_status": normalized["interaction_status"], "updates": updates}
 
 
 def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
@@ -2142,6 +2219,52 @@ async def update_interaction_status_route(
             principal=principal,
             payload={"interaction_id": interaction_id, "channel": interaction.get("channel"), "provider": payload_updates.get("email_provider", "manual")},
         )
+    return _success({"interaction": _interaction_projection(updated)})
+
+
+@app.post("/v1/providers/expandi/status")
+async def sync_expandi_status(
+    payload: ExpandiStatusSyncRequest,
+    request: Request,
+) -> Dict[str, Any]:
+    webhook_secret = env("EXPANDI_STATUS_WEBHOOK_SECRET")
+    provided_secret = request.headers.get("X-Expandi-Webhook-Secret", "")
+    if webhook_secret and provided_secret == webhook_secret:
+        principal = APIPrincipal(role="admin", auth_method="expandi_webhook")
+    else:
+        if webhook_secret and provided_secret:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Expandi webhook secret")
+        principal = require_principal(
+            authorization=request.headers.get("Authorization"),
+            x_api_key=request.headers.get("X-API-Key"),
+        )
+
+    lookup_payload = dict(payload.raw or {})
+    for key, value in payload.model_dump().items():
+        if value not in ("", {}, None):
+            lookup_payload[key] = value
+    interaction = find_linkedin_interaction_for_status(lookup_payload)
+    if not interaction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LinkedIn interaction not found for Expandi status")
+    authorize_tenant(principal, interaction["tenant_id"])
+
+    status_payload = _expandi_status_payload(payload)
+    updated = update_interaction_status(str(interaction["id"]), status_payload["interaction_status"], status_payload["updates"])
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
+
+    _record_audit_event(
+        tenant_id=interaction["tenant_id"],
+        candidate_id=interaction["candidate_id"],
+        event_type="interaction.expandi_status_synced",
+        principal=principal,
+        payload={
+            "interaction_id": str(interaction["id"]),
+            "provider_status": status_payload["updates"].get("provider_status"),
+            "provider_status_label": status_payload["updates"].get("provider_status_label"),
+            "provider_status_raw": status_payload["updates"].get("provider_status_raw"),
+        },
+    )
     return _success({"interaction": _interaction_projection(updated)})
 
 

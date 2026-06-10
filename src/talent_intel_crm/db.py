@@ -437,6 +437,69 @@ def get_interaction(interaction_id: str) -> dict[str, Any]:
             return dict(cur.fetchone() or {})
 
 
+def find_linkedin_interaction_for_status(payload: dict[str, Any]) -> dict[str, Any]:
+    interaction_id = str(payload.get("interaction_id") or "").strip()
+    provider_message_id = str(payload.get("provider_message_id") or payload.get("lead_id") or payload.get("message_id") or payload.get("messenger_id") or "").strip()
+    tenant_id = str(payload.get("tenant_id") or "").strip()
+    candidate_id = str(payload.get("candidate_id") or payload.get("external_id") or "").strip()
+
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            if interaction_id:
+                cur.execute(
+                    """
+                    select id, tenant_id, candidate_id, channel, message_type, status, provider_message_id,
+                        provider_thread_id, idempotency_key, payload_json, created_at
+                    from interactions
+                    where id::text = %s and channel = 'linkedin'
+                    """,
+                    (interaction_id,),
+                )
+                row = cur.fetchone()
+                if row:
+                    return dict(row)
+
+            if provider_message_id:
+                cur.execute(
+                    """
+                    select id, tenant_id, candidate_id, channel, message_type, status, provider_message_id,
+                        provider_thread_id, idempotency_key, payload_json, created_at
+                    from interactions
+                    where channel = 'linkedin'
+                      and (
+                        provider_message_id = %s
+                        or payload_json->>'provider_message_id' = %s
+                        or payload_json->>'lead_id' = %s
+                        or payload_json->>'messenger_id' = %s
+                      )
+                    order by created_at desc
+                    limit 1
+                    """,
+                    (provider_message_id, provider_message_id, provider_message_id, provider_message_id),
+                )
+                row = cur.fetchone()
+                if row:
+                    return dict(row)
+
+            if tenant_id and candidate_id:
+                cur.execute(
+                    """
+                    select id, tenant_id, candidate_id, channel, message_type, status, provider_message_id,
+                        provider_thread_id, idempotency_key, payload_json, created_at
+                    from interactions
+                    where tenant_id = %s and candidate_id = %s and channel = 'linkedin'
+                    order by created_at desc
+                    limit 1
+                    """,
+                    (tenant_id, candidate_id),
+                )
+                row = cur.fetchone()
+                if row:
+                    return dict(row)
+
+    return {}
+
+
 def update_interaction_status(interaction_id: str, status: str, payload_updates: dict[str, Any] | None = None) -> dict[str, Any]:
     payload_updates = payload_updates or {}
     provider_message_id = payload_updates.get("provider_message_id")
