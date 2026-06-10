@@ -706,6 +706,45 @@ def test_sync_expandi_status_rejects_invalid_secret(monkeypatch) -> None:
     assert response.status_code == 401
 
 
+def test_sync_expandi_status_accepts_query_secret_and_extra_payload(monkeypatch) -> None:
+    interaction = {
+        "id": "interaction-001",
+        "tenant_id": "tenant-001",
+        "candidate_id": "candidate-001",
+        "channel": "linkedin",
+        "message_type": "initial",
+        "status": "sent",
+        "provider_message_id": "",
+        "provider_thread_id": None,
+        "idempotency_key": "idem-001",
+        "payload_json": {"linkedin_provider": "expandi", "provider_executed": True},
+        "created_at": datetime.now(timezone.utc),
+    }
+    monkeypatch.setattr(api, "env", lambda key, default="": "webhook-secret" if key == "EXPANDI_STATUS_WEBHOOK_SECRET" else default)
+    monkeypatch.setattr(api, "find_linkedin_interaction_for_status", lambda payload: interaction if payload["interaction_id"] == "interaction-001" else {})
+
+    def update(interaction_id, status, payload_updates):
+        return {
+            **interaction,
+            "id": interaction_id,
+            "status": status,
+            "payload_json": {**interaction["payload_json"], **payload_updates, "status": status},
+        }
+
+    monkeypatch.setattr(api, "update_interaction_status", update)
+
+    response = TestClient(api.app).post(
+        "/v1/providers/expandi/status?secret=webhook-secret",
+        json={"interaction_id": "interaction-001", "event_type": "Contact Replied", "message": "Tenho interesse."},
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]["interaction"]
+    assert data["status"] == "replied"
+    assert data["provider_status"] == "replied"
+    assert data["response_received"] == "Tenho interesse."
+
+
 def test_poll_expandi_status_updates_matching_interactions(monkeypatch) -> None:
     events: list[dict[str, object]] = []
     interaction = {

@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
 from talent_intel_crm.auth import APIPrincipal, api_key_prefix, authorize_tenant, hash_api_key, new_tenant_api_key, require_admin, require_principal, require_tenant_admin
@@ -126,6 +126,8 @@ class InteractionReviewRequest(BaseModel):
 
 
 class ExpandiStatusSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     interaction_id: str = Field(default="", max_length=160)
     tenant_id: str = Field(default="", max_length=120)
     candidate_id: str = Field(default="", max_length=160)
@@ -783,7 +785,9 @@ def _normalize_expandi_status(raw_status: str, raw_event: str = "") -> Dict[str,
 
 def _expandi_status_payload(payload: ExpandiStatusSyncRequest) -> Dict[str, Any]:
     raw_payload = payload.model_dump(exclude_none=True)
-    raw = payload.raw if isinstance(payload.raw, dict) else {}
+    extra_payload = payload.model_extra or {}
+    raw_payload.update(extra_payload)
+    raw = {**extra_payload, **payload.raw} if isinstance(payload.raw, dict) else extra_payload
     provider_message_id = (
         payload.provider_message_id
         or payload.lead_id
@@ -2410,7 +2414,7 @@ async def sync_expandi_status(
     request: Request,
 ) -> Dict[str, Any]:
     webhook_secret = env("EXPANDI_STATUS_WEBHOOK_SECRET")
-    provided_secret = request.headers.get("X-Expandi-Webhook-Secret", "")
+    provided_secret = request.headers.get("X-Expandi-Webhook-Secret", "") or request.query_params.get("secret", "")
     if webhook_secret and provided_secret == webhook_secret:
         principal = APIPrincipal(role="admin", auth_method="expandi_webhook")
     else:
@@ -2421,7 +2425,9 @@ async def sync_expandi_status(
             x_api_key=request.headers.get("X-API-Key"),
         )
 
-    lookup_payload = dict(payload.raw or {})
+    lookup_payload = dict(payload.model_extra or {})
+    if payload.raw:
+        lookup_payload.update(payload.raw)
     for key, value in payload.model_dump().items():
         if value not in ("", {}, None):
             lookup_payload[key] = value
