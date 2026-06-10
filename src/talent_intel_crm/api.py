@@ -852,6 +852,11 @@ def _expandi_status_poll_url(limit: int) -> str:
     linkedin_account_id = env("EXPANDI_LINKEDIN_ACCOUNT_ID")
     if linkedin_account_id:
         query["li_account_id"] = linkedin_account_id
+    api_key = env("EXPANDI_API_KEY")
+    api_secret = env("EXPANDI_API_SECRET")
+    if api_key and api_secret:
+        query["key"] = api_key
+        query["secret"] = api_secret
     return f"https://api.liaufa.com/api/v1/linkedin/messenger/?{urllib.parse.urlencode(query)}"
 
 
