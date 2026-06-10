@@ -27,6 +27,7 @@ function StatusButton({
       <input type="hidden" name="tenant_id" value={tenantId} />
       <input type="hidden" name="candidate_id" value={interaction.candidate_id} />
       <input type="hidden" name="interaction_id" value={interaction.id} />
+      <input type="hidden" name="channel" value={interaction.channel} />
       <input type="hidden" name="status" value={status} />
       {status === 'replied' ? <input type="hidden" name="response_received" value="Resposta recebida e registrada manualmente." /> : null}
       <button
@@ -46,7 +47,7 @@ function StatusButton({
 }
 
 export function InteractionStatusForms({ interaction, tenantId }: InteractionStatusFormsProps) {
-  const sendLabel = interaction.channel === 'email' ? 'Enviar e-mail' : 'Marcar enviada';
+  const sendLabel = interaction.channel === 'email' ? 'Enviar e-mail' : 'Enviar via Expandi';
   return (
     <div className="flex flex-wrap gap-2">
       <StatusButton interaction={interaction} tenantId={tenantId} status="sent" label={sendLabel} />

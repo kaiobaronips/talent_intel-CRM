@@ -8,6 +8,7 @@ import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
 import { getCandidate, getCandidateInteractions } from '@/lib/api';
 import { formatDateTime, formatScore } from '@/lib/format';
+import { interactionDisplayStatus } from '@/lib/interactions';
 import { resolveActiveTenantId } from '@/lib/session';
 import type { Interaction } from '@/lib/types';
 
@@ -131,7 +132,10 @@ export default async function CandidateDetailPage({ params }: CandidateDetailPag
         emptyLabel="Nenhum contato preparado para este candidato."
         columns={[
           { key: 'channel', label: 'Canal', render: (row) => <StatusBadge value={row.channel} label={channelLabel(row.channel)} /> },
-          { key: 'status', label: 'Situação', render: (row) => <StatusBadge value={row.status ?? row.interaction_status} /> },
+          { key: 'status', label: 'Situação', render: (row) => {
+            const status = interactionDisplayStatus(row);
+            return <StatusBadge value={status.value} label={status.label} />;
+          } },
           { key: 'type', label: 'Tipo', render: (row) => cleanValue(row.message_type) },
           { key: 'next', label: 'Próxima ação', render: (row) => cleanValue(row.next_action) },
           { key: 'message', label: 'Mensagem preparada', render: (row) => cleanValue(row.message_sent) },

@@ -6,6 +6,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { Shell } from '@/components/Shell';
 import { StatusBadge } from '@/components/StatusBadge';
 import { getInteractions, getTenantMetrics } from '@/lib/api';
+import { interactionDisplayStatus } from '@/lib/interactions';
 import { resolveActiveTenantId } from '@/lib/session';
 import type { Interaction } from '@/lib/types';
 
@@ -38,7 +39,10 @@ export default async function InteractionsPage() {
         columns={[
           { key: 'candidate', label: 'Candidato', render: (row) => <Link href={`/candidates/${row.candidate_id}`} className="font-black text-stone-950 underline decoration-amber-400 decoration-2 underline-offset-4">{row.candidate_name ?? row.candidate_id}</Link> },
           { key: 'channel', label: 'Canal', render: (row) => <StatusBadge value={row.channel} /> },
-          { key: 'interaction', label: 'Situação', render: (row) => <StatusBadge value={row.interaction_status} /> },
+          { key: 'interaction', label: 'Situação', render: (row) => {
+            const status = interactionDisplayStatus(row);
+            return <StatusBadge value={status.value} label={status.label} />;
+          } },
           { key: 'next', label: 'Próxima ação', render: (row) => <StatusBadge value={row.next_action} /> },
           { key: 'sent', label: 'Mensagem', render: (row) => row.message_sent ?? '-' },
           { key: 'response', label: 'Resposta', render: (row) => row.response_received ?? '-' },

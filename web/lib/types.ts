@@ -86,6 +86,8 @@ export type Interaction = {
   email_subject?: string | null;
   provider_message_id?: string | null;
   provider_thread_id?: string | null;
+  linkedin_provider?: string | null;
+  provider_executed?: boolean | null;
   cadence_step?: string | null;
   scheduled_after_days?: number | null;
   payload_json?: Record<string, unknown> | null;

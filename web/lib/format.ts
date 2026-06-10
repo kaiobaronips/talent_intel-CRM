@@ -24,6 +24,7 @@ const statusLabels: Record<string, string> = {
   complete: 'Concluído',
   running: 'Em andamento',
   queued: 'Na fila',
+  expandi_delegated: 'Entregue ao Expandi',
   enfileirado: 'Na fila',
   failed: 'Falhou',
   erro: 'Erro',

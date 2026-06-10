@@ -402,6 +402,7 @@ export async function updateInteractionStatusAction(_previousState: ActionState,
   const interactionId = text(formData, 'interaction_id');
   const status = text(formData, 'status') as InteractionStatus;
   const responseReceived = text(formData, 'response_received');
+  const channel = text(formData, 'channel');
 
   if (!interactionId || !candidateId || !status) {
     return { ...initialError, message: 'Contato inválido para atualização.' };
@@ -413,7 +414,14 @@ export async function updateInteractionStatusAction(_previousState: ActionState,
   }
 
   revalidateInteractionViews(tenantId, candidateId);
-  const label = status === 'sent' ? 'Mensagem marcada como enviada.' : status === 'replied' ? 'Resposta registrada.' : 'Contato atualizado.';
+  const label =
+    status === 'sent' && channel === 'linkedin'
+      ? 'Contato entregue ao Expandi.'
+      : status === 'sent'
+        ? 'Mensagem enviada.'
+        : status === 'replied'
+          ? 'Resposta registrada.'
+          : 'Contato atualizado.';
   return { ok: true, message: label };
 }
 
