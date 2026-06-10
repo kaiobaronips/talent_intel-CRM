@@ -33,6 +33,7 @@ from talent_intel_crm.db import (
     list_tenants,
     list_tenant_api_keys,
     list_tenant_audit_events,
+    list_tenant_expandi_interactions,
     list_tenant_candidates,
     list_tenant_interactions,
     list_tenant_memberships,
@@ -138,6 +139,11 @@ class ExpandiStatusSyncRequest(BaseModel):
     message: str = Field(default="", max_length=4000)
     response_received: str = Field(default="", max_length=4000)
     raw: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ExpandiPollSyncRequest(BaseModel):
+    limit: int = Field(default=100, ge=1, le=500)
+    dry_run: bool = False
 
 
 class CandidateDecisionRequest(BaseModel):
@@ -812,6 +818,178 @@ def _expandi_status_payload(payload: ExpandiStatusSyncRequest) -> Dict[str, Any]
         updates["linkedin_sent_at"] = datetime.now(timezone.utc).isoformat()
 
     return {"interaction_status": normalized["interaction_status"], "updates": updates}
+
+
+def _expandi_api_headers() -> Dict[str, str]:
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "TalentIntelCRM/1.0 (+https://talent-intel-crm.vercel.app)",
+    }
+    api_key = env("EXPANDI_API_KEY")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+        headers["X-API-Key"] = api_key
+    api_secret = env("EXPANDI_API_SECRET")
+    if api_secret:
+        headers["X-API-Secret"] = api_secret
+        headers["X-Expandi-API-Secret"] = api_secret
+    return headers
+
+
+def _expandi_status_poll_url(limit: int) -> str:
+    configured_url = env("EXPANDI_STATUS_POLL_URL")
+    if configured_url:
+        return configured_url.format(limit=limit, campaign_id=urllib.parse.quote(env("EXPANDI_CAMPAIGN_ID", "")))
+
+    campaign_id = env("EXPANDI_CAMPAIGN_ID")
+    if not campaign_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="EXPANDI_CAMPAIGN_ID precisa estar configurado para polling.")
+
+    query: Dict[str, str] = {
+        "contact__campaigninstance[]": campaign_id,
+        "page": "1",
+        "page_size": str(limit),
+    }
+    linkedin_account_id = env("EXPANDI_LINKEDIN_ACCOUNT_ID")
+    if linkedin_account_id:
+        query["li_account_id"] = linkedin_account_id
+    return f"https://api.liaufa.com/api/v1/linkedin/messenger/?{urllib.parse.urlencode(query)}"
+
+
+def _expandi_response_items(payload: Any) -> List[Dict[str, Any]]:
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if not isinstance(payload, dict):
+        return []
+    for key in ("results", "items", "data", "contacts", "messengers"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+        if isinstance(value, dict):
+            nested = _expandi_response_items(value)
+            if nested:
+                return nested
+    return [payload] if payload else []
+
+
+def _nested_value(data: Dict[str, Any], *keys: str) -> Any:
+    current: Any = data
+    for key in keys:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+
+def _string_from_item(item: Dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value: Any = item
+        for part in key.split("."):
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(part)
+        if value is not None and value != "":
+            return str(value).strip()
+    return ""
+
+
+def _expandi_item_to_status_request(item: Dict[str, Any], fallback: Dict[str, Any] | None = None) -> ExpandiStatusSyncRequest:
+    fallback = fallback or {}
+    custom_fields = item.get("custom_fields") if isinstance(item.get("custom_fields"), dict) else {}
+    placeholders = item.get("placeholders") if isinstance(item.get("placeholders"), dict) else {}
+    custom_placeholders = item.get("custom_placeholders") if isinstance(item.get("custom_placeholders"), dict) else {}
+    merged = {**custom_fields, **placeholders, **custom_placeholders, **item}
+
+    provider_message_id = _string_from_item(
+        merged,
+        "provider_message_id",
+        "lead_id",
+        "messenger_id",
+        "message_id",
+        "campaign_contact_id",
+        "id",
+        "contact.id",
+    )
+    raw_status = _string_from_item(
+        merged,
+        "status",
+        "running_status",
+        "campaign_running_status",
+        "state",
+        "current_status",
+        "status_name",
+        "step_status",
+    )
+    if raw_status.isdigit():
+        status_map = {
+            "1": "queued",
+            "2": "running",
+            "3": "queued",
+            "4": "sent",
+            "5": "connected",
+            "6": "failed",
+        }
+        raw_status = status_map.get(raw_status, raw_status)
+
+    response = _string_from_item(merged, "response_received", "last_message", "message", "reply.text")
+    candidate_id = _string_from_item(merged, "candidate_id", "external_id") or str(fallback.get("candidate_id") or "")
+    interaction_id = _string_from_item(merged, "interaction_id") or str(fallback.get("id") or "")
+
+    return ExpandiStatusSyncRequest(
+        interaction_id=interaction_id,
+        tenant_id=str(fallback.get("tenant_id") or _string_from_item(merged, "tenant_id")),
+        candidate_id=candidate_id,
+        lead_id=provider_message_id,
+        provider_message_id=provider_message_id,
+        status=raw_status or "synced",
+        event=_string_from_item(merged, "event", "event_type", "type"),
+        reason=_string_from_item(merged, "reason", "reason_failed", "error", "error_message"),
+        response_received=response,
+        raw=item,
+    )
+
+
+def _fetch_expandi_status_items(limit: int) -> List[Dict[str, Any]]:
+    poll_url = _expandi_status_poll_url(limit)
+    request = urllib.request.Request(poll_url, method="GET", headers=_expandi_api_headers())
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            raw = response.read().decode("utf-8")
+            payload = json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8") if exc.fp else ""
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Expandi retornou HTTP {exc.code}: {raw[:300]}") from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Falha ao consultar status no Expandi.") from exc
+    return _expandi_response_items(payload)
+
+
+def _interaction_lookup_key(interaction: Dict[str, Any]) -> tuple[str, str, str]:
+    payload = interaction.get("payload_json") if isinstance(interaction.get("payload_json"), dict) else {}
+    provider_id = str(interaction.get("provider_message_id") or payload.get("provider_message_id") or payload.get("lead_id") or "").strip()
+    return (str(interaction.get("id") or ""), str(interaction.get("candidate_id") or ""), provider_id)
+
+
+def _apply_expandi_status(interaction: Dict[str, Any], payload: ExpandiStatusSyncRequest, principal: APIPrincipal) -> Dict[str, Any]:
+    status_payload = _expandi_status_payload(payload)
+    updated = update_interaction_status(str(interaction["id"]), status_payload["interaction_status"], status_payload["updates"])
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
+
+    _record_audit_event(
+        tenant_id=interaction["tenant_id"],
+        candidate_id=interaction["candidate_id"],
+        event_type="interaction.expandi_status_synced",
+        principal=principal,
+        payload={
+            "interaction_id": str(interaction["id"]),
+            "provider_status": status_payload["updates"].get("provider_status"),
+            "provider_status_label": status_payload["updates"].get("provider_status_label"),
+            "provider_status_raw": status_payload["updates"].get("provider_status_raw"),
+        },
+    )
+    return updated
 
 
 def _interaction_projection(interaction: Dict[str, Any]) -> Dict[str, Any]:
@@ -2248,24 +2426,83 @@ async def sync_expandi_status(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LinkedIn interaction not found for Expandi status")
     authorize_tenant(principal, interaction["tenant_id"])
 
-    status_payload = _expandi_status_payload(payload)
-    updated = update_interaction_status(str(interaction["id"]), status_payload["interaction_status"], status_payload["updates"])
-    if not updated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction not found")
-
-    _record_audit_event(
-        tenant_id=interaction["tenant_id"],
-        candidate_id=interaction["candidate_id"],
-        event_type="interaction.expandi_status_synced",
-        principal=principal,
-        payload={
-            "interaction_id": str(interaction["id"]),
-            "provider_status": status_payload["updates"].get("provider_status"),
-            "provider_status_label": status_payload["updates"].get("provider_status_label"),
-            "provider_status_raw": status_payload["updates"].get("provider_status_raw"),
-        },
-    )
+    updated = _apply_expandi_status(interaction, payload, principal)
     return _success({"interaction": _interaction_projection(updated)})
+
+
+@app.post("/v1/tenants/{tenant_id}/providers/expandi/poll")
+async def poll_expandi_status(
+    tenant_id: str,
+    payload: ExpandiPollSyncRequest,
+    principal: APIPrincipal = Depends(require_principal),
+) -> Dict[str, Any]:
+    require_tenant_admin(principal, tenant_id)
+    if not tenant_exists(tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+
+    interactions = list_tenant_expandi_interactions(tenant_id, payload.limit)
+    interactions_by_interaction_id = {str(interaction.get("id")): interaction for interaction in interactions}
+    interactions_by_candidate_id = {str(interaction.get("candidate_id")): interaction for interaction in interactions}
+    interactions_by_provider_id = {}
+    for interaction in interactions:
+        _interaction_id, _candidate_id, provider_id = _interaction_lookup_key(interaction)
+        if provider_id:
+            interactions_by_provider_id[provider_id] = interaction
+
+    items = _fetch_expandi_status_items(payload.limit)
+    synced: List[Dict[str, Any]] = []
+    unmatched: List[Dict[str, Any]] = []
+    for item in items:
+        status_request = _expandi_item_to_status_request(item)
+        match = (
+            interactions_by_interaction_id.get(status_request.interaction_id)
+            or interactions_by_provider_id.get(status_request.provider_message_id or status_request.lead_id)
+            or interactions_by_candidate_id.get(status_request.candidate_id)
+        )
+        if not match:
+            unmatched.append(
+                {
+                    "provider_message_id": status_request.provider_message_id or status_request.lead_id,
+                    "candidate_id": status_request.candidate_id,
+                    "status": status_request.status,
+                }
+            )
+            continue
+
+        status_request = _expandi_item_to_status_request(item, match)
+        if payload.dry_run:
+            normalized = _normalize_expandi_status(status_request.status, status_request.event)
+            synced.append(
+                {
+                    "interaction_id": str(match.get("id")),
+                    "candidate_id": str(match.get("candidate_id")),
+                    "provider_status": normalized["provider_status"],
+                    "provider_status_label": normalized["label"],
+                    "dry_run": True,
+                }
+            )
+            continue
+
+        updated = _apply_expandi_status(match, status_request, principal)
+        projected = _interaction_projection(updated)
+        synced.append(
+            {
+                "interaction_id": projected["id"],
+                "candidate_id": projected["candidate_id"],
+                "provider_status": projected.get("provider_status"),
+                "provider_status_label": projected.get("provider_status_label"),
+            }
+        )
+
+    return _success(
+        {
+            "tenant_id": tenant_id,
+            "checked": len(items),
+            "synced": synced,
+            "unmatched": unmatched,
+            "dry_run": payload.dry_run,
+        }
+    )
 
 
 @app.post("/v1/interactions/{interaction_id}/review")

@@ -87,6 +87,8 @@ As activities usam `Supabase Postgres` como persistencia principal e webhooks op
 - `EXPANDI_API_SECRET` opcional, enviada como `X-API-Secret` e `X-Expandi-API-Secret`
 - `EXPANDI_CAMPAIGN_ID` opcional, incluída no payload do webhook
 - `EXPANDI_STATUS_WEBHOOK_SECRET` segredo opcional para o callback `POST /v1/providers/expandi/status`; envie o valor no header `X-Expandi-Webhook-Secret`
+- `EXPANDI_LINKEDIN_ACCOUNT_ID` opcional para filtrar o polling de status por conta LinkedIn no Expandi
+- `EXPANDI_STATUS_POLL_URL` opcional para sobrescrever a URL consultada por `POST /v1/tenants/{tenant_id}/providers/expandi/poll`; aceita `{campaign_id}` e `{limit}`
 - `LINKEDIN_SEARCH_WEBHOOK_URL`
 - `APOLLO_API_KEY`
 - `CANDIDATE_ENRICHMENT_WEBHOOK_URL`

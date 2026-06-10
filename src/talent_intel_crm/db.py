@@ -422,6 +422,28 @@ def list_tenant_interactions(tenant_id: str, page: int, limit: int) -> dict[str,
             return {"items": [dict(row) for row in cur.fetchall()], "total": total}
 
 
+def list_tenant_expandi_interactions(tenant_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    with get_connection() as connection:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                select id, tenant_id, candidate_id, channel, message_type, status, provider_message_id,
+                    provider_thread_id, idempotency_key, payload_json, created_at
+                from interactions
+                where tenant_id = %s
+                  and channel = 'linkedin'
+                  and (
+                    payload_json->>'linkedin_provider' = 'expandi'
+                    or payload_json->>'provider_target' = 'expandi'
+                  )
+                order by created_at desc, id desc
+                limit %s
+                """,
+                (tenant_id, limit),
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+
 def get_interaction(interaction_id: str) -> dict[str, Any]:
     with get_connection() as connection:
         with connection.cursor() as cur:

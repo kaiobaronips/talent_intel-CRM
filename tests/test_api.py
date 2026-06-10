@@ -706,6 +706,87 @@ def test_sync_expandi_status_rejects_invalid_secret(monkeypatch) -> None:
     assert response.status_code == 401
 
 
+def test_poll_expandi_status_updates_matching_interactions(monkeypatch) -> None:
+    events: list[dict[str, object]] = []
+    interaction = {
+        "id": "interaction-001",
+        "tenant_id": "tenant-001",
+        "candidate_id": "candidate-001",
+        "channel": "linkedin",
+        "message_type": "initial",
+        "status": "sent",
+        "provider_message_id": "lead-001",
+        "provider_thread_id": None,
+        "idempotency_key": "idem-001",
+        "payload_json": {
+            "name": "Candidate One",
+            "linkedin_provider": "expandi",
+            "provider_executed": True,
+        },
+        "created_at": datetime.now(timezone.utc),
+    }
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "list_tenant_expandi_interactions", lambda _tenant_id, _limit: [interaction])
+    monkeypatch.setattr(
+        api,
+        "_fetch_expandi_status_items",
+        lambda _limit: [{"id": "lead-001", "candidate_id": "candidate-001", "interaction_id": "interaction-001", "status": "connected"}],
+    )
+
+    def update(interaction_id, status, payload_updates):
+        return {
+            **interaction,
+            "id": interaction_id,
+            "status": status,
+            "payload_json": {**interaction["payload_json"], **payload_updates, "status": status},
+        }
+
+    monkeypatch.setattr(api, "update_interaction_status", update)
+    monkeypatch.setattr(api, "append_audit_event", lambda payload: events.append(payload) or {"id": "audit-1", **payload})
+
+    response = TestClient(api.app).post("/v1/tenants/tenant-001/providers/expandi/poll", json={"limit": 50})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["checked"] == 1
+    assert data["synced"][0]["interaction_id"] == "interaction-001"
+    assert data["synced"][0]["provider_status"] == "connected"
+    assert data["synced"][0]["provider_status_label"] == "Conectado"
+    assert data["unmatched"] == []
+    assert events[0]["event_type"] == "interaction.expandi_status_synced"
+
+
+def test_poll_expandi_status_dry_run_does_not_update(monkeypatch) -> None:
+    interaction = {
+        "id": "interaction-001",
+        "tenant_id": "tenant-001",
+        "candidate_id": "candidate-001",
+        "channel": "linkedin",
+        "message_type": "initial",
+        "status": "sent",
+        "provider_message_id": "lead-001",
+        "provider_thread_id": None,
+        "idempotency_key": "idem-001",
+        "payload_json": {"linkedin_provider": "expandi", "provider_executed": True},
+        "created_at": datetime.now(timezone.utc),
+    }
+    monkeypatch.setattr(api, "tenant_exists", lambda _tenant_id: True)
+    monkeypatch.setattr(api, "list_tenant_expandi_interactions", lambda _tenant_id, _limit: [interaction])
+    monkeypatch.setattr(api, "_fetch_expandi_status_items", lambda _limit: [{"id": "lead-001", "status": "queued"}])
+
+    def fail_update(*_args, **_kwargs):
+        raise AssertionError("dry_run should not update interactions")
+
+    monkeypatch.setattr(api, "update_interaction_status", fail_update)
+
+    response = TestClient(api.app).post("/v1/tenants/tenant-001/providers/expandi/poll", json={"dry_run": True})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["dry_run"] is True
+    assert data["synced"][0]["provider_status"] == "queued"
+
+
 def test_sent_interaction_requires_approval(monkeypatch) -> None:
     monkeypatch.setattr(
         api,
