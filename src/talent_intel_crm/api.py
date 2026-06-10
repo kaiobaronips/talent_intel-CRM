@@ -827,7 +827,6 @@ def _expandi_api_headers() -> Dict[str, str]:
     }
     api_key = env("EXPANDI_API_KEY")
     if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
         headers["X-API-Key"] = api_key
     api_secret = env("EXPANDI_API_SECRET")
     if api_secret:
